@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ConCen</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="toolbar" aria-label="ConCen controls">
+        <div class="brand-lockup" aria-label="ConCen">
+          <span class="concen-logo" aria-hidden="true">
+            <span>C</span>
+            <span>C</span>
+          </span>
+          <span class="brand-name">ConCen</span>
+        </div>
+        <div class="toolbar-group map-controls" aria-label="Map controls">
+          <label class="map-field">
+            <span>Map</span>
+            <select id="mapSelect"></select>
+          </label>
+          <button id="parentMapButton" class="icon-button" data-icon="‹" type="button" title="Go to parent map (Ctrl+Left)" aria-label="Go to parent map">
+            <span class="visually-hidden">Parent Map</span>
+          </button>
+          <button id="childMapButton" class="icon-button" data-icon="›" type="button" title="Return to recent child map (Ctrl+Right)" aria-label="Return to recent child map">
+            <span class="visually-hidden">Child Map</span>
+          </button>
+          <button id="newMapButton" class="icon-button" data-icon="+" type="button" title="New map" aria-label="New map">
+            <span class="visually-hidden">New Map</span>
+          </button>
+        </div>
+
+        <div class="toolbar-group title-controls" aria-label="Title controls">
+          <label class="title-field">
+            <span>Title</span>
+            <input id="titleInput" type="text" value="Chart Title" autocomplete="off">
+          </label>
+        </div>
+
+        <div class="toolbar-group utility-controls" aria-label="View controls">
+          <output id="saveState" class="save-state" aria-live="polite">Autosaved</output>
+          <button id="commandPaletteButton" class="icon-button" data-icon="⌘" type="button" title="Search and commands (Ctrl+K)" aria-label="Search and commands">
+            <span class="visually-hidden">Search and Commands</span>
+          </button>
+          <details class="mind-menu command-menu">
+            <summary class="icon-button" data-icon="◌" title="Mind actions" aria-label="Mind actions">
+              <span class="visually-hidden">Mind</span>
+            </summary>
+            <div class="command-panel">
+              <button id="newMindButton" type="button" data-icon="+">New Mind</button>
+              <button id="saveMindButton" type="button" data-icon="✓">Save Mind</button>
+              <button id="exportMindButton" type="button" data-icon="⇧">Save Copy</button>
+              <label class="import-mind" data-icon="⇩">
+                <span>Open Mind</span>
+                <input id="importMindInput" type="file" accept="application/json,.json">
+              </label>
+              <button id="clearRecentMindsButton" type="button" data-icon="⌫">Clear Recents</button>
+              <button id="deleteMapButton" type="button" class="quiet-danger" data-icon="−">Delete Map</button>
+              <button id="resetButton" type="button" class="quiet-danger" data-icon="×">Reset Mind</button>
+            </div>
+          </details>
+          <details class="settings-menu">
+            <summary class="icon-button" data-icon="⚙" title="Settings" aria-label="Settings">
+              <span class="visually-hidden">Settings</span>
+            </summary>
+            <div class="settings-panel">
+              <label class="mode-toggle">
+                <input id="viewModeInput" type="checkbox" checked>
+                <span>Grouped</span>
+              </label>
+              <div class="theme-controls" aria-label="Theme controls">
+                <label class="theme-field">
+                  <span>Theme</span>
+                  <select id="themePresetInput"></select>
+                </label>
+                <label class="theme-field">
+                  <span>Style</span>
+                  <select id="stylePresetInput"></select>
+                </label>
+                <label class="theme-field">
+                  <span>Navigation</span>
+                  <select id="navigationModeInput"></select>
+                </label>
+                <div id="customThemeEditor" class="custom-theme-editor" aria-label="Custom theme colors" hidden></div>
+                <div>
+                  <span class="theme-label">Branches</span>
+                  <div id="branchPalette" class="branch-palette" aria-label="Branch colors"></div>
+                </div>
+                <div class="theme-actions">
+                  <button id="shufflePaletteButton" type="button" data-icon="⇄">Shuffle</button>
+                  <button id="resetPaletteButton" type="button" data-icon="↺">Reset</button>
+                  <button id="exportThemeButton" type="button" data-icon="⇧">Export</button>
+                  <label class="import-theme" data-icon="⇩">
+                    <span>Import</span>
+                    <input id="importThemeInput" type="file" accept="application/json,.json">
+                  </label>
+                </div>
+              </div>
+              <div class="spacing-controls" aria-label="Spacing controls">
+                <label>
+                  <span>Flat radius</span>
+                  <input id="treeLevelGapInput" type="number" min="40" max="260" step="4" value="82">
+                </label>
+                <label>
+                  <span>Flat nodes</span>
+                  <input id="treeLeafGapInput" type="number" min="60" max="360" step="4" value="110">
+                </label>
+                <label>
+                  <span>Ring radius</span>
+                  <input id="ringBaseRadiusInput" type="number" min="60" max="500" step="5" value="110">
+                </label>
+                <label>
+                  <span>Ring layers</span>
+                  <input id="ringDepthGapInput" type="number" min="60" max="500" step="5" value="100">
+                </label>
+                <label>
+                  <span>Ring nodes</span>
+                  <input id="ringNodeGapInput" type="number" min="0" max="200" step="4" value="28">
+                </label>
+                <label>
+                  <span>Font size</span>
+                  <input id="nodeFontSizeInput" type="number" min="9" max="22" step="0.5" value="13">
+                </label>
+              </div>
+            </div>
+          </details>
+        </div>
+      </header>
+
+      <section class="canvas-wrap" aria-label="ConCen editor">
+        <div id="pathTrail" class="path-trail" aria-label="Map path"></div>
+        <svg id="chartCanvas" role="application" aria-label="ConCen mind map" tabindex="0"></svg>
+        <div id="nodeActionBar" class="node-action-bar" aria-label="Focused node actions" hidden>
+          <label class="node-field">
+            <span>Focus</span>
+            <input id="nodeLabelInput" type="text" value="Chart Title" autocomplete="off">
+          </label>
+          <button id="addButton" class="icon-button" data-icon="+" type="button" title="Add child (Enter)" aria-label="Add child">
+            <span class="visually-hidden">Add Child</span>
+          </button>
+          <button id="renameButton" class="icon-button" data-icon="✓" type="button" title="Apply label" aria-label="Apply label">
+            <span class="visually-hidden">Apply Label</span>
+          </button>
+          <button id="openMapButton" class="icon-button" data-icon="↳" type="button" title="Open node map (Alt+Enter)" aria-label="Open node map">
+            <span class="visually-hidden">Open Map</span>
+          </button>
+          <button id="reparentButton" class="icon-button" data-icon="↑" type="button" title="Create parent (Ctrl+Shift+Enter)" aria-label="Create parent">
+            <span class="visually-hidden">Create Parent</span>
+          </button>
+          <button id="noteButton" class="icon-button" data-icon="✎" type="button" title="Toggle notes (Ctrl+Enter)" aria-label="Toggle notes">
+            <span class="visually-hidden">Open Notes</span>
+          </button>
+          <button id="deleteButton" class="icon-button quiet-danger" data-icon="×" type="button" title="Delete node" aria-label="Delete node">
+            <span class="visually-hidden">Delete</span>
+          </button>
+        </div>
+        <aside id="noteSidebar" class="note-sidebar" aria-label="Node inspector" hidden>
+          <div class="note-sidebar-header">
+            <div>
+              <span class="note-eyebrow">Inspector</span>
+              <h2 id="noteSidebarTitle">Chart Title</h2>
+            </div>
+            <button id="closeNoteButton" class="icon-button" data-icon="×" type="button" title="Close inspector" aria-label="Close inspector">
+              <span class="visually-hidden">Close Inspector</span>
+            </button>
+          </div>
+          <div class="node-meta-grid">
+            <label>
+              <span>Status</span>
+              <select id="nodeStatusInput" aria-label="Node status">
+                <option value="open">Open</option>
+                <option value="active">Active</option>
+                <option value="waiting">Waiting</option>
+                <option value="done">Done</option>
+              </select>
+            </label>
+            <label>
+              <span>Priority</span>
+              <select id="nodePriorityInput" aria-label="Node priority">
+                <option value="low">Low</option>
+                <option value="normal">Normal</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </label>
+            <label class="wide">
+              <span>Tags</span>
+              <input id="nodeTagsInput" type="text" aria-label="Node tags" placeholder="comma, separated">
+            </label>
+            <label class="wide checkbox-field">
+              <span>Show marker</span>
+              <input id="nodeMarkerInput" type="checkbox" aria-label="Show priority marker colored by status">
+            </label>
+          </div>
+          <textarea id="noteInput" aria-label="Node note" placeholder="Add note"></textarea>
+          <div id="nodeLinkSuggest" class="node-link-suggest" role="listbox" aria-label="Node link suggestions" hidden></div>
+          <div id="noteLinks" class="note-links" aria-label="Detected note links"></div>
+          <div id="backlinks" class="backlinks" aria-label="Backlinks"></div>
+        </aside>
+        <output id="statusText" class="status-pill" aria-live="polite"></output>
+        <input id="nodeEditor" class="node-editor" type="text" autocomplete="off" aria-label="Edit node label">
+      </section>
+      <div id="commandPalette" class="command-palette" role="dialog" aria-modal="true" aria-label="Search and commands" hidden>
+        <div class="palette-panel">
+          <input id="commandInput" type="search" autocomplete="off" placeholder="Search nodes, notes, or commands">
+          <div id="commandResults" class="command-results"></div>
+        </div>
+      </div>
+      <div id="welcomeDialog" class="welcome-dialog" role="dialog" aria-modal="true" aria-label="Welcome to ConCen" hidden>
+        <div class="welcome-panel">
+          <div class="welcome-head">
+            <div>
+              <span class="note-eyebrow">Welcome</span>
+              <h1>ConCen</h1>
+            </div>
+            <output id="welcomeStats" class="welcome-stats"></output>
+          </div>
+          <p>Build ring maps, write linked notes, and move ideas around without losing structure.</p>
+          <div class="welcome-section">
+            <span class="welcome-label">Start from template</span>
+            <div class="welcome-templates" id="welcomeTemplates">
+              <button type="button" data-template="blank">Blank</button>
+              <button type="button" data-template="project">Project Plan</button>
+              <button type="button" data-template="decision">Decision Map</button>
+              <button type="button" data-template="research">Research Notes</button>
+              <button type="button" data-template="issues">Issue Tracker</button>
+            </div>
+          </div>
+          <div class="welcome-section">
+            <span class="welcome-label">Choose style</span>
+            <div class="welcome-style-row" id="welcomeStyles">
+              <button type="button" data-style="glass">Glass</button>
+              <button type="button" data-style="papery">Papery</button>
+              <button type="button" data-style="blueprint">Blueprint</button>
+              <button type="button" data-style="terminal">Terminal</button>
+            </div>
+          </div>
+          <div class="welcome-grid">
+            <span>Enter adds a child</span>
+            <span>Ctrl+K searches and commands</span>
+            <span>[[node name]] links notes</span>
+            <span>Backlinks appear automatically</span>
+            <span>Alt+Enter opens a node map</span>
+            <span>Type move in commands to reparent</span>
+          </div>
+          <div class="welcome-section">
+            <span class="welcome-label">Recent minds</span>
+            <div id="welcomeRecent" class="welcome-recent"></div>
+          </div>
+          <div class="welcome-actions">
+            <button id="welcomeCommandButton" type="button" data-icon="⌘">Open Commands</button>
+            <button id="welcomeCloseButton" type="button" data-icon="✓">Start Mapping</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script src="src/config.js"></script>
+    <script src="src/utils.js"></script>
+    <script src="src/model.js"></script>
+    <script src="src/storage.js"></script>
+    <script src="src/layout.js"></script>
+    <script src="src/renderer.js"></script>
+    <script src="src/controller.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
