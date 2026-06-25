@@ -149,7 +149,7 @@
           <button id="reparentButton" class="icon-button" data-icon="↑" type="button" title="Create parent (Ctrl+Shift+Enter)" aria-label="Create parent">
             <span class="visually-hidden">Create Parent</span>
           </button>
-          <button id="noteButton" class="icon-button" data-icon="✎" type="button" title="Toggle notes (Ctrl+Enter)" aria-label="Toggle notes">
+          <button id="noteButton" class="icon-button" data-icon="✎" type="button" title="Toggle notes (Ctrl+Enter or Ctrl+click node)" aria-label="Toggle notes">
             <span class="visually-hidden">Open Notes</span>
           </button>
           <button id="deleteButton" class="icon-button quiet-danger" data-icon="×" type="button" title="Delete node" aria-label="Delete node">
@@ -218,6 +218,13 @@
             <output id="welcomeStats" class="welcome-stats"></output>
           </div>
           <p>Build ring maps, write linked notes, and move ideas around without losing structure.</p>
+          <div class="welcome-section">
+            <span class="welcome-label">Guided start</span>
+            <div class="welcome-tutorial">
+              <button id="welcomeTutorialButton" type="button" data-icon="▶">Start Tutorial Mind Map</button>
+              <span>Learn by opening notes, following links, searching commands, and moving nodes.</span>
+            </div>
+          </div>
           <div class="welcome-section">
             <span class="welcome-label">Start from template</span>
             <div class="welcome-templates" id="welcomeTemplates">

@@ -154,6 +154,7 @@
       this.closeWelcome();
       this.openCommandPalette();
     });
+    if (this.el.welcomeTutorialButton) this.el.welcomeTutorialButton.addEventListener("click", () => this.startTutorial());
     if (this.el.welcomeDialog) this.el.welcomeDialog.addEventListener("pointerdown", (event) => {
       if (event.target === this.el.welcomeDialog) this.closeWelcome();
     });
@@ -895,7 +896,7 @@
       previousPositions: this.layoutAnimationPositions,
       viewBox
     }, {
-      focus: (id) => this.focusNode(id),
+      focus: (id, event) => this.focusNode(id, event),
       edit: (id) => this.startEdit(id),
       nodePointerDown: (event, id) => this.startNodeDrag(event, id)
     });
@@ -910,14 +911,15 @@
     this.layoutAnimationPositions = null;
   };
 
-  Controller.prototype.focusNode = function (id) {
+  Controller.prototype.focusNode = function (id, event) {
     this.saveFocusedNote();
     if (!model.setFocus(this.store, id)) return;
     this.hideEditor();
     this.syncNoteSidebar(true);
     this.actionBarOpen = true;
     this.afterTreeChange(false, true);
-    this.el.svg.focus();
+    if (event && (event.ctrlKey || event.metaKey)) this.openNoteSidebar();
+    else this.el.svg.focus();
   };
 
   Controller.prototype.scheduleRender = function (revealFocus) {
@@ -1122,6 +1124,7 @@
       input.type = "color";
       input.value = this.customTheme[control.key] || config.themePresets.custom.tokens[control.key] || "#000000";
       input.addEventListener("input", () => {
+        if (document.activeElement !== input) return;
         this.theme = "custom";
         this.customTheme[control.key] = input.value;
         this.customTheme = storage.normalizeCustomTheme(this.customTheme);
@@ -1570,11 +1573,11 @@
     this.updateStatus(`Style: ${config.stylePresets[this.appearance.stylePreset].label}`);
   };
 
-  Controller.prototype.applyWelcomeTemplate = function (template) {
+  Controller.prototype.applyWelcomeTemplate = function (template, options) {
     const tree = welcomeTemplateTree(template);
-    if (!tree) return;
+    if (!tree) return false;
     const hasWork = Object.keys(this.mind.nodes).length > 1 || this.currentMindNode()?.label !== "Chart Title";
-    if (hasWork && !confirm("Replace current mind with this starter template?")) return;
+    if (hasWork && !confirm("Replace current mind with this starter template?")) return false;
     this.pushUndoSnapshot();
     this.store = model.createStore(model.cloneAsRoot(tree));
     this.mind = model.createMindFromTree(this.store.tree);
@@ -1590,7 +1593,25 @@
     this.syncControls();
     this.render();
     this.renderWelcome();
+    if (options && options.closeWelcome) this.closeWelcome();
     this.updateStatus("Template loaded");
+    return true;
+  };
+
+  Controller.prototype.startTutorial = function () {
+    if (!this.applyWelcomeTemplate("tutorial", { closeWelcome: true })) return;
+    this.createTutorialChapterMaps();
+    this.updateStatus("Tutorial loaded. Ctrl+click root node to begin.");
+  };
+
+  Controller.prototype.createTutorialChapterMaps = function () {
+    Object.values(this.mind.nodes)
+      .filter((node) => /^Chapter \d+:/.test(node.label) || /^\d+\./.test(node.label))
+      .forEach((node) => {
+        if (!this.maps.some((map) => map.rootNodeId === node.id)) this.maps.push(this.createMap(node.id, node.label));
+      });
+    this.save();
+    this.syncControls();
   };
 
   Controller.prototype.handleCommandKey = function (event) {
@@ -1663,7 +1684,7 @@
       { kind: "command", title: "Save copy", detail: ".mind.json", run: () => this.exportMind() },
       { kind: "command", title: "Clear recents", detail: "Remove stored snapshots", run: () => this.clearRecentMinds() },
       { kind: "command", title: "Export theme", detail: ".concen-theme.json", run: () => this.exportTheme() },
-      { kind: "command", title: "Toggle notes", detail: "Ctrl+Enter", run: () => this.toggleNoteSidebar() },
+      { kind: "command", title: "Toggle notes", detail: "Ctrl+Enter or Ctrl+click", run: () => this.toggleNoteSidebar() },
       { kind: "command", title: focusedNode && focusedNode.markerEnabled ? "Hide marker" : "Show marker", detail: "Focused node", run: () => this.setFocusedMarker(!(focusedNode && focusedNode.markerEnabled)) },
       { kind: "command", title: "Open node map", detail: "Alt+Enter", run: () => this.createMapFromFocusedNode() },
       { kind: "command", title: "Create parent", detail: "Ctrl+Shift+Enter", run: () => this.createParentForFocusedNode() },
@@ -2157,10 +2178,6 @@
     if (!found || !sourceId || sourceId === this.mind.rootId) return;
     event.preventDefault();
     event.stopPropagation();
-    this.hideEditor();
-    this.closeNoteSidebar(false);
-    model.setFocus(this.store, id);
-    this.actionBarOpen = false;
     this.nodeDrag = {
       pointerId: event.pointerId,
       id,
@@ -2179,6 +2196,11 @@
     if (!drag || drag.pointerId !== event.pointerId) return;
     const moved = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
     if (!drag.active && moved < 6) return;
+    if (!drag.active) {
+      this.hideEditor();
+      this.closeNoteSidebar(false);
+      this.actionBarOpen = false;
+    }
     drag.active = true;
     event.preventDefault();
     const target = this.nodeDropTarget(event.clientX, event.clientY, drag.sourceId);
@@ -2194,7 +2216,7 @@
       this.el.svg.releasePointerCapture(event.pointerId);
     }
     if (!drag.active) {
-      this.focusNode(drag.id);
+      this.focusNode(drag.id, event);
       return;
     }
     event.preventDefault();
@@ -2471,6 +2493,63 @@
     });
     const templates = {
       blank: child("Chart Title", []),
+      tutorial: child("Ctrl+click this node", [
+        child("Chapter 1: Basics", [
+          child("1. Select Nodes", [
+            child("Click Practice", [], "Click this node. Notice the focus ring and action bar."),
+            child("2. Add Children", [
+              child("Add Here", [], "Focus this node and press Enter. A child appears. You can delete practice children later."),
+              child("3. Rename", [], "Focus this node, press Shift+Enter, type a new label, then press Enter.")
+            ], "Focus [[Add Here]], then press Enter once. That creates a child under the focused node. Next: [[3. Rename]].", "open")
+          ], "Click any node to focus it. Focus decides where Enter, notes, and commands apply. Task: click [[Click Practice]]. Next: [[2. Add Children]].", "active", "high"),
+          child("Chapter 2: Notes", [
+            child("1. Inspector", [
+              child("Return Focus", [], "Press Ctrl+Enter while this note is open. Focus returns to this node."),
+              child("2. Metadata", [
+                child("Status Example", [], "Change status to Active and priority to High. Turn marker on to see the symbol."),
+                child("3. Tags", [], "Add tag tutorial, then search tutorial from Ctrl+K.")
+              ], "Status colors the priority marker. Priority changes the symbol. Task: edit [[Status Example]]. Next: [[3. Tags]].", "open")
+            ], "Ctrl+Enter opens and closes the inspector. Task: click [[Return Focus]], open notes, then Ctrl+Enter back to canvas. Next: [[2. Metadata]].", "active"),
+            child("Chapter 3: Links", [
+              child("1. Type Link", [
+                child("Link Target", [], "This is target for practice links."),
+                child("2. Backlinks", [
+                  child("Backlink Target", [], "This node is linked from lesson note. Linked from should show where it came from."),
+                  child("3. Follow Path", [], "Click this node, then use map path controls above canvas.")
+                ], "This note links to [[Backlink Target]]. Open that node and watch Linked from appear. Next: [[3. Follow Path]].", "open")
+              ], "Type [[ in this note and choose Link Target. After inserting, look below note for link chip. Next: [[2. Backlinks]].", "active"),
+              child("Chapter 4: Commands", [
+                child("1. Search", [
+                  child("Find This Node", [], "Press Ctrl+K, type Find This, press Enter."),
+                  child("2. Actions", [
+                    child("Action Target", [], "Use Ctrl+K and type marker, status, or priority while this node is focused."),
+                    child("3. Move Command", [], "Focus this node, press Ctrl+K, type move, choose Action Target.")
+                  ], "Commands can edit focused node. Task: focus [[Action Target]], press Ctrl+K, type marker. Next: [[3. Move Command]].", "open")
+                ], "Ctrl+K searches labels, notes, tags, status, and priority. Task: search for [[Find This Node]]. Next: [[2. Actions]].", "active"),
+                child("Chapter 5: Moving", [
+                  child("1. Drag Move", [
+                    child("Drag Me", [], "Drag this node onto Drop Zone."),
+                    child("Drop Zone", [], "Drop Drag Me here."),
+                    child("2. Animation", [
+                      child("Watch Siblings", [], "When nodes shift, they settle with a short animation."),
+                      child("3. Safety", [], "Use Ctrl+Z after a move if you dislike result.")
+                    ], "Moves displace nearby nodes. Watch siblings settle after move. Next: [[3. Safety]].", "open")
+                  ], "Drag one node onto another to make it child. Task: drag [[Drag Me]] onto [[Drop Zone]]. Next: [[2. Animation]].", "active"),
+                  child("Chapter 6: Maps", [
+                    child("1. Open Map", [
+                      child("Nested Practice", [], "Focus this node and press Alt+Enter to open it as its own map."),
+                      child("2. Map Path", [
+                        child("Path Buttons", [], "Use path buttons above canvas to climb back to parent maps."),
+                        child("3. Finish", [], "Open Welcome from Ctrl+K, then choose real template or blank mind. Done.")
+                      ], "Path buttons show where this map lives. Next: [[3. Finish]].", "open")
+                    ], "Any node can become map. Task: focus [[Nested Practice]], press Alt+Enter. Next: [[2. Map Path]].", "active")
+                  ], "Maps keep large topics focused. Start at [[1. Open Map]]. Return to previous view with Ctrl+Left or path trail above canvas.", "done")
+                ], "This chapter is practice sandbox for reparenting. Start at [[1. Drag Move]]. Next chapter is child node [[Chapter 6: Maps]].", "waiting")
+              ], "Ctrl+K is search plus action palette. Start at [[1. Search]]. Next chapter is child node [[Chapter 5: Moving]].", "open")
+            ], "Links use exact node labels inside double brackets. Start at [[1. Type Link]]. Next chapter is child node [[Chapter 4: Commands]].", "waiting")
+          ], "Notes hold details without crowding ring. Start at [[1. Inspector]]. Next chapter is child node [[Chapter 3: Links]].", "open")
+        ], "Open this chapter with Alt+Enter. It contains basics lessons and child node [[Chapter 2: Notes]]. Return to previous view with Ctrl+Left or path trail above canvas.", "active", "high")
+      ], "Start here. Ctrl+click opened this note.\n\nNext: click [[Chapter 1: Basics]], then press Alt+Enter to enter chapter map.\n\nChapters are nested one inside previous, so each chapter view stays focused. Return with Ctrl+Left or path trail above canvas.", "active", "critical"),
       project: child("Project Plan", [
         child("Goals", [child("Outcome"), child("Constraints")]),
         child("Workstreams", [child("Design"), child("Build"), child("Launch")]),

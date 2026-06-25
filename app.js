@@ -53,6 +53,7 @@
     closeNoteButton: document.getElementById("closeNoteButton"),
     welcomeDialog: document.getElementById("welcomeDialog"),
     welcomeStats: document.getElementById("welcomeStats"),
+    welcomeTutorialButton: document.getElementById("welcomeTutorialButton"),
     welcomeTemplates: document.getElementById("welcomeTemplates"),
     welcomeStyles: document.getElementById("welcomeStyles"),
     welcomeRecent: document.getElementById("welcomeRecent"),

@@ -163,7 +163,7 @@
     if (node.id === animatedNewId) group.classList.add("node-enter");
 
     group.addEventListener("pointerdown", (event) => handlers.nodePointerDown(event, node.id));
-    group.addEventListener("click", () => handlers.focus(node.id));
+    group.addEventListener("click", (event) => handlers.focus(node.id, event));
     group.addEventListener("dblclick", () => handlers.edit(node.id));
 
     if (previousPoint && Math.hypot(previousPoint.x - point.x, previousPoint.y - point.y) > 2) {

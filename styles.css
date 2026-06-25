@@ -1311,11 +1311,33 @@ button:disabled:hover {
   gap: 8px;
 }
 
+.welcome-tutorial {
+  display: grid;
+  grid-template-columns: minmax(190px, auto) 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--focus) 28%, var(--hairline));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--focus) 8%, var(--field));
+}
+
 .welcome-templates button,
 .welcome-style-row button,
-.welcome-recent button {
+.welcome-recent button,
+.welcome-tutorial button {
   min-height: 34px;
   box-shadow: var(--shadow-sm);
+}
+
+.welcome-tutorial button {
+  background: color-mix(in srgb, var(--focus) 18%, var(--control));
+}
+
+.welcome-tutorial span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .welcome-templates button {
@@ -1977,6 +1999,10 @@ button:disabled:hover {
   .welcome-stats {
     justify-self: start;
     white-space: normal;
+  }
+
+  .welcome-tutorial {
+    grid-template-columns: 1fr;
   }
 
   .welcome-actions {
