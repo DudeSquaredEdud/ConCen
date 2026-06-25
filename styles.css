@@ -485,6 +485,43 @@ summary:focus-visible,
   color: var(--danger-ink);
 }
 
+.segmented-control,
+.zoom-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 30px;
+  padding: 2px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--surface-recessed);
+}
+
+.segmented-control button,
+.zoom-controls button {
+  min-height: 26px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.segmented-control button {
+  min-width: 48px;
+  padding: 0 11px;
+}
+
+.segmented-control button[aria-pressed="true"] {
+  border-color: var(--glass-border);
+  background: var(--control);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+.zoom-controls .icon-button {
+  width: 28px;
+  min-width: 28px;
+}
+
 .map-field,
 .import-mind,
 .import-theme,
@@ -751,6 +788,13 @@ button:disabled:hover {
   background: var(--surface-recessed);
 }
 
+.settings-section-title {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 780;
+  line-height: 1;
+}
+
 .theme-field {
   display: grid;
   grid-template-columns: 1fr minmax(150px, 1.4fr);
@@ -840,17 +884,34 @@ button:disabled:hover {
 
 .spacing-controls {
   display: grid;
-  grid-template-columns: repeat(2, minmax(135px, 1fr));
-  gap: 8px;
+  grid-template-columns: 1fr;
+  gap: 10px;
   padding: 10px;
   border: 1px solid var(--hairline);
   border-radius: 14px;
   background: var(--surface-recessed);
 }
 
-.spacing-controls label {
+.spacing-header {
   display: grid;
-  grid-template-columns: 1fr 64px;
+  gap: 8px;
+}
+
+.layout-preset-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.layout-preset-row button {
+  min-height: 30px;
+  padding: 0 8px;
+}
+
+.spacing-controls label,
+.range-field {
+  display: grid;
+  grid-template-columns: 78px minmax(120px, 1fr) 58px;
   align-items: center;
   gap: 8px;
   color: var(--label);
@@ -858,15 +919,21 @@ button:disabled:hover {
   font-weight: 650;
 }
 
-.spacing-controls input {
+.spacing-controls input[type="number"] {
   height: 28px;
-  width: 64px;
+  width: 58px;
   border: 1px solid var(--glass-border);
   border-radius: 8px;
   padding: 0 7px;
   color: var(--ink);
   background: var(--field);
   box-shadow: var(--shadow-sm);
+}
+
+.spacing-controls input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  accent-color: var(--focus);
 }
 
 .spacing-controls .checkbox-field input {
@@ -1894,7 +1961,6 @@ button:disabled:hover {
   .map-field select,
   .title-field input,
   .node-field input,
-  .toolbar button,
   .node-action-bar button,
   .command-panel button,
   .theme-actions button,
@@ -1904,6 +1970,51 @@ button:disabled:hover {
     width: 100%;
     min-height: 36px;
     justify-content: center;
+  }
+
+  .utility-controls {
+    grid-template-columns: minmax(0, 1fr) repeat(3, 38px);
+    align-items: center;
+  }
+
+  .utility-controls .save-state {
+    grid-column: 1;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .utility-controls #commandPaletteButton {
+    grid-column: 2;
+  }
+
+  .utility-controls .mind-menu {
+    grid-column: 3;
+  }
+
+  .utility-controls .settings-menu {
+    grid-column: 4;
+  }
+
+  .utility-controls .mind-menu,
+  .utility-controls .settings-menu {
+    width: 100%;
+  }
+
+  .utility-controls .mind-menu > summary,
+  .utility-controls .settings-menu > summary {
+    width: 100%;
+  }
+
+  .segmented-control,
+  .zoom-controls {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .segmented-control button,
+  .zoom-controls button {
+    width: 100%;
+    min-height: 32px;
   }
 
   .settings-menu {
@@ -1920,16 +2031,31 @@ button:disabled:hover {
 
   .settings-menu[open] .settings-panel {
     position: fixed;
+    top: auto;
     left: 8px;
     right: 8px;
     bottom: 8px;
+    height: auto;
     z-index: 30;
     max-height: min(70vh, 560px);
     overflow: auto;
   }
 
+  .settings-menu[open] > summary {
+    position: relative;
+    z-index: 31;
+  }
+
   .spacing-controls {
     grid-template-columns: 1fr;
+  }
+
+  .range-field {
+    grid-template-columns: 1fr 58px;
+  }
+
+  .range-field span {
+    grid-column: 1 / -1;
   }
 
   .theme-field,

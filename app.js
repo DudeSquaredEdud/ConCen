@@ -23,6 +23,11 @@
     commandInput: document.getElementById("commandInput"),
     commandResults: document.getElementById("commandResults"),
     viewModeInput: document.getElementById("viewModeInput"),
+    ringViewButton: document.getElementById("ringViewButton"),
+    treeViewButton: document.getElementById("treeViewButton"),
+    zoomOutButton: document.getElementById("zoomOutButton"),
+    fitViewButton: document.getElementById("fitViewButton"),
+    zoomInButton: document.getElementById("zoomInButton"),
     themePresetInput: document.getElementById("themePresetInput"),
     stylePresetInput: document.getElementById("stylePresetInput"),
     navigationModeInput: document.getElementById("navigationModeInput"),
@@ -69,9 +74,20 @@
       ringDepthGap: document.getElementById("ringDepthGapInput"),
       ringNodeGap: document.getElementById("ringNodeGapInput")
     },
+    spacingRanges: {
+      treeLevelGap: document.getElementById("treeLevelGapRange"),
+      treeLeafGap: document.getElementById("treeLeafGapRange"),
+      ringBaseRadius: document.getElementById("ringBaseRadiusRange"),
+      ringDepthGap: document.getElementById("ringDepthGapRange"),
+      ringNodeGap: document.getElementById("ringNodeGapRange")
+    },
     appearanceInputs: {
       nodeFontSize: document.getElementById("nodeFontSizeInput")
     },
+    appearanceRanges: {
+      nodeFontSize: document.getElementById("nodeFontSizeRange")
+    },
+    layoutPresetButtons: Array.from(document.querySelectorAll("[data-layout-preset]")),
     appearanceToggles: {}
   });
 

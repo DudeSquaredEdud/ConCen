@@ -5,6 +5,11 @@
   const { config, model, storage, utils } = RingMapChart;
   const WELCOME_KEY = "ring-map-chart-welcome-v1";
   const DEFAULT_BRANCH_COLORS = config.colors.slice();
+  const LAYOUT_PRESETS = {
+    compact: { treeLevelGap: 64, treeLeafGap: 84, ringBaseRadius: 88, ringDepthGap: 76, ringNodeGap: 12 },
+    balanced: { treeLevelGap: 82, treeLeafGap: 110, ringBaseRadius: 110, ringDepthGap: 100, ringNodeGap: 28 },
+    wide: { treeLevelGap: 118, treeLeafGap: 160, ringBaseRadius: 155, ringDepthGap: 145, ringNodeGap: 58 }
+  };
   const MANAGED_THEME_TOKEN_KEYS = Array.from(new Set(
     Object.values(config.themePresets)
       .flatMap((preset) => Object.keys(preset.tokens))
@@ -61,10 +66,12 @@
     this.viewMode = "ring";
     this.viewport = { width: config.layout.minViewportWidth, height: config.layout.minViewportHeight };
     this.world = { width: config.layout.minViewportWidth, height: config.layout.minViewportHeight };
+    this.currentBounds = null;
     this.positions = new Map();
     this.camera = { x: 0, y: 0, scale: 1 };
     this.cameraReady = false;
     this.renderQueued = false;
+    this.pendingRenderStatus = "";
     this.editingId = null;
     this.animatedNewNodeId = null;
     this.noteCloseTimer = null;
@@ -179,11 +186,14 @@
       });
     });
 
-    this.el.viewModeInput.addEventListener("change", () => {
-      this.viewMode = this.el.viewModeInput.checked ? "ring" : "tree";
-      this.save();
-      this.scheduleRender(true);
-    });
+    if (this.el.viewModeInput) {
+      this.el.viewModeInput.addEventListener("change", () => this.setViewMode(this.el.viewModeInput.checked ? "ring" : "tree"));
+    }
+    if (this.el.ringViewButton) this.el.ringViewButton.addEventListener("click", () => this.setViewMode("ring"));
+    if (this.el.treeViewButton) this.el.treeViewButton.addEventListener("click", () => this.setViewMode("tree"));
+    if (this.el.zoomOutButton) this.el.zoomOutButton.addEventListener("click", () => this.zoomBy(0.85));
+    if (this.el.zoomInButton) this.el.zoomInButton.addEventListener("click", () => this.zoomBy(1.18));
+    if (this.el.fitViewButton) this.el.fitViewButton.addEventListener("click", () => this.fitCurrentView());
     if (this.el.stylePresetInput) {
       this.el.stylePresetInput.addEventListener("change", () => {
         this.appearance.stylePreset = storage.normalizeStylePreset(this.el.stylePresetInput.value);
@@ -201,7 +211,7 @@
       });
     }
     Object.entries(this.el.appearanceInputs).forEach(([key, input]) => {
-      input.addEventListener("change", () => {
+      const applyAppearanceValue = () => {
         const limits = config.appearanceLimits[key];
         this.appearance[key] = utils.clampNumber(input.value, limits.min, limits.max, this.appearance[key]);
         this.syncAppearanceInputs(true);
@@ -209,7 +219,15 @@
         this.save();
         this.shouldRevealFocus = true;
         this.render();
-      });
+      };
+      input.addEventListener("change", applyAppearanceValue);
+      const range = this.el.appearanceRanges && this.el.appearanceRanges[key];
+      if (range) {
+        range.addEventListener("input", () => {
+          input.value = range.value;
+          applyAppearanceValue();
+        });
+      }
       input.addEventListener("keydown", (event) => {
         if (event.key === "Enter") {
           event.preventDefault();
@@ -241,20 +259,31 @@
     this.el.importThemeInput.addEventListener("change", () => this.importTheme());
 
     Object.entries(this.el.spacingInputs).forEach(([key, input]) => {
-      input.addEventListener("change", () => {
+      const applySpacingValue = () => {
         const limits = config.spacingLimits[key];
         this.spacing[key] = utils.clampNumber(input.value, limits.min, limits.max, this.spacing[key]);
         this.syncSpacingInputs(true);
         this.save();
         this.shouldRevealFocus = true;
         this.render();
-      });
+      };
+      input.addEventListener("change", applySpacingValue);
+      const range = this.el.spacingRanges && this.el.spacingRanges[key];
+      if (range) {
+        range.addEventListener("input", () => {
+          input.value = range.value;
+          applySpacingValue();
+        });
+      }
       input.addEventListener("keydown", (event) => {
         if (event.key === "Enter") {
           event.preventDefault();
           input.blur();
         }
       });
+    });
+    (this.el.layoutPresetButtons || []).forEach((button) => {
+      button.addEventListener("click", () => this.applyLayoutPreset(button.dataset.layoutPreset));
     });
 
     this.el.addButton.addEventListener("click", () => this.addNode());
@@ -870,6 +899,7 @@
 
     const layout = this.layoutEngine.layout(this.store.tree, this.viewport, this.viewMode, this.spacing);
     this.world = layout.world;
+    this.currentBounds = layout.bounds;
     this.positions = layout.positions;
     if (!this.cameraReady) {
       this.centerCamera();
@@ -901,7 +931,9 @@
       nodePointerDown: (event, id) => this.startNodeDrag(event, id)
     });
 
-    this.updateStatus();
+    const pendingStatus = this.pendingRenderStatus;
+    this.pendingRenderStatus = "";
+    this.updateStatus(pendingStatus);
     this.syncNoteSidebar();
     this.positionEditor();
     this.positionActionBar();
@@ -935,7 +967,7 @@
   Controller.prototype.syncControls = function () {
     this.syncMapSelect();
     this.el.titleInput.value = this.store.tree.label;
-    this.el.viewModeInput.checked = this.viewMode === "ring";
+    this.syncViewModeControls();
     this.applyTheme();
     this.applyAppearance();
     this.syncThemeControls();
@@ -965,6 +997,8 @@
     Object.entries(this.el.spacingInputs).forEach(([key, input]) => {
       if (!force && document.activeElement === input) return;
       input.value = String(this.spacing[key]);
+      const range = this.el.spacingRanges && this.el.spacingRanges[key];
+      if (range && (force || document.activeElement !== range)) range.value = String(this.spacing[key]);
     });
   };
 
@@ -972,6 +1006,8 @@
     Object.entries(this.el.appearanceInputs).forEach(([key, input]) => {
       if (!force && document.activeElement === input) return;
       input.value = String(this.appearance[key]);
+      const range = this.el.appearanceRanges && this.el.appearanceRanges[key];
+      if (range && (force || document.activeElement !== range)) range.value = String(this.appearance[key]);
     });
     Object.entries(this.el.appearanceToggles || {}).forEach(([key, input]) => {
       if (!input) return;
@@ -987,7 +1023,7 @@
     const canAdd = node.depth < config.limits.maxDepth && node.children.length < config.limits.maxChildren;
     if (document.activeElement !== this.el.titleInput) this.el.titleInput.value = this.store.tree.label;
     if (document.activeElement !== this.el.nodeLabelInput) this.el.nodeLabelInput.value = node.label;
-    this.el.viewModeInput.checked = this.viewMode === "ring";
+    this.syncViewModeControls();
     this.syncThemeControls();
     this.syncSpacingInputs(false);
     this.syncAppearanceInputs(false);
@@ -1000,6 +1036,13 @@
     this.syncMapSelect();
     this.updatePathTrail();
     this.el.statusText.textContent = message || `${depthNames[node.depth]} focus | ${node.children.length}/12 children${canAdd ? "" : " | max reached"}`;
+  };
+
+  Controller.prototype.syncViewModeControls = function () {
+    const isRing = this.viewMode === "ring";
+    if (this.el.viewModeInput) this.el.viewModeInput.checked = isRing;
+    if (this.el.ringViewButton) this.el.ringViewButton.setAttribute("aria-pressed", String(isRing));
+    if (this.el.treeViewButton) this.el.treeViewButton.setAttribute("aria-pressed", String(!isRing));
   };
 
   Controller.prototype.updatePathTrail = function () {
@@ -1876,10 +1919,30 @@
   };
 
   Controller.prototype.toggleViewMode = function () {
-    this.viewMode = this.viewMode === "ring" ? "tree" : "ring";
+    this.setViewMode(this.viewMode === "ring" ? "tree" : "ring");
+  };
+
+  Controller.prototype.setViewMode = function (mode) {
+    const nextMode = mode === "tree" ? "tree" : "ring";
+    if (this.viewMode === nextMode) {
+      this.syncViewModeControls();
+      return;
+    }
+    this.viewMode = nextMode;
     this.save();
     this.syncControls();
     this.scheduleRender(true);
+  };
+
+  Controller.prototype.applyLayoutPreset = function (presetName) {
+    const preset = LAYOUT_PRESETS[presetName];
+    if (!preset) return;
+    this.spacing = storage.normalizeSpacing(preset, config.spacingDefaults);
+    this.syncSpacingInputs(true);
+    this.save();
+    this.shouldRevealFocus = true;
+    this.render();
+    this.updateStatus("Layout: " + titleCase(presetName));
   };
 
   Controller.prototype.cycleStylePreset = function () {
@@ -2157,6 +2220,34 @@
     this.camera.x = bounds.left + bounds.width / 2 - (this.viewport.width / this.camera.scale) / 2;
     this.camera.y = bounds.top + bounds.height / 2 - (this.viewport.height / this.camera.scale) / 2;
     this.clampCamera();
+  };
+
+  Controller.prototype.fitCurrentView = function () {
+    if (!this.currentBounds) {
+      this.shouldRevealFocus = true;
+      this.render();
+      return;
+    }
+    this.fitBounds(this.currentBounds);
+    this.pendingRenderStatus = "Fit view";
+    this.updateStatus("Fit view");
+    this.scheduleRender(false);
+  };
+
+  Controller.prototype.zoomBy = function (factor) {
+    const rect = this.el.svg.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const before = this.clientToWorld(centerX, centerY);
+    this.camera.scale = utils.clampNumber(this.camera.scale * factor, 0.35, 4, 1);
+    this.clampCamera();
+    const view = this.viewBox();
+    this.camera.x = before.x - view.width / 2;
+    this.camera.y = before.y - view.height / 2;
+    this.clampCamera();
+    this.pendingRenderStatus = Math.round(this.camera.scale * 100) + "% zoom";
+    this.updateStatus(this.pendingRenderStatus);
+    this.scheduleRender(false);
   };
 
   Controller.prototype.zoomAt = function (clientX, clientY, deltaY) {

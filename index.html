@@ -41,6 +41,21 @@
 
         <div class="toolbar-group utility-controls" aria-label="View controls">
           <output id="saveState" class="save-state" aria-live="polite">Autosaved</output>
+          <div class="segmented-control view-mode-control" role="group" aria-label="View mode">
+            <button id="ringViewButton" type="button" aria-pressed="true">Ring</button>
+            <button id="treeViewButton" type="button" aria-pressed="false">Flat</button>
+          </div>
+          <div class="zoom-controls" role="group" aria-label="Zoom controls">
+            <button id="zoomOutButton" class="icon-button" data-icon="−" type="button" title="Zoom out" aria-label="Zoom out">
+              <span class="visually-hidden">Zoom Out</span>
+            </button>
+            <button id="fitViewButton" class="icon-button" data-icon="□" type="button" title="Fit view" aria-label="Fit view">
+              <span class="visually-hidden">Fit View</span>
+            </button>
+            <button id="zoomInButton" class="icon-button" data-icon="+" type="button" title="Zoom in" aria-label="Zoom in">
+              <span class="visually-hidden">Zoom In</span>
+            </button>
+          </div>
           <button id="commandPaletteButton" class="icon-button" data-icon="⌘" type="button" title="Search and commands (Ctrl+K)" aria-label="Search and commands">
             <span class="visually-hidden">Search and Commands</span>
           </button>
@@ -66,11 +81,9 @@
               <span class="visually-hidden">Settings</span>
             </summary>
             <div class="settings-panel">
-              <label class="mode-toggle">
-                <input id="viewModeInput" type="checkbox" checked>
-                <span>Grouped</span>
-              </label>
+              <input id="viewModeInput" class="legacy-view-mode" type="checkbox" checked hidden>
               <div class="theme-controls" aria-label="Theme controls">
+                <span class="settings-section-title">Appearance</span>
                 <label class="theme-field">
                   <span>Theme</span>
                   <select id="themePresetInput"></select>
@@ -99,30 +112,44 @@
                 </div>
               </div>
               <div class="spacing-controls" aria-label="Spacing controls">
-                <label>
-                  <span>Flat radius</span>
-                  <input id="treeLevelGapInput" type="number" min="40" max="260" step="4" value="82">
-                </label>
-                <label>
-                  <span>Flat nodes</span>
-                  <input id="treeLeafGapInput" type="number" min="60" max="360" step="4" value="110">
-                </label>
-                <label>
-                  <span>Ring radius</span>
-                  <input id="ringBaseRadiusInput" type="number" min="60" max="500" step="5" value="110">
-                </label>
-                <label>
-                  <span>Ring layers</span>
-                  <input id="ringDepthGapInput" type="number" min="60" max="500" step="5" value="100">
-                </label>
-                <label>
-                  <span>Ring nodes</span>
-                  <input id="ringNodeGapInput" type="number" min="0" max="200" step="4" value="28">
-                </label>
-                <label>
-                  <span>Font size</span>
-                  <input id="nodeFontSizeInput" type="number" min="9" max="22" step="0.5" value="13">
-                </label>
+                <div class="spacing-header">
+                  <span class="settings-section-title">Layout</span>
+                  <div class="layout-preset-row" role="group" aria-label="Layout presets">
+                    <button type="button" data-layout-preset="compact">Compact</button>
+                    <button type="button" data-layout-preset="balanced">Balanced</button>
+                    <button type="button" data-layout-preset="wide">Wide</button>
+                  </div>
+                </div>
+                <div class="range-field" role="group" aria-labelledby="treeLevelGapLabel">
+                  <span id="treeLevelGapLabel">Flat radius</span>
+                  <input id="treeLevelGapRange" type="range" min="40" max="260" step="4" value="82" aria-labelledby="treeLevelGapLabel">
+                  <input id="treeLevelGapInput" type="number" min="40" max="260" step="4" value="82" aria-label="Flat radius value">
+                </div>
+                <div class="range-field" role="group" aria-labelledby="treeLeafGapLabel">
+                  <span id="treeLeafGapLabel">Flat nodes</span>
+                  <input id="treeLeafGapRange" type="range" min="60" max="360" step="4" value="110" aria-labelledby="treeLeafGapLabel">
+                  <input id="treeLeafGapInput" type="number" min="60" max="360" step="4" value="110" aria-label="Flat nodes value">
+                </div>
+                <div class="range-field" role="group" aria-labelledby="ringBaseRadiusLabel">
+                  <span id="ringBaseRadiusLabel">Ring radius</span>
+                  <input id="ringBaseRadiusRange" type="range" min="60" max="500" step="5" value="110" aria-labelledby="ringBaseRadiusLabel">
+                  <input id="ringBaseRadiusInput" type="number" min="60" max="500" step="5" value="110" aria-label="Ring radius value">
+                </div>
+                <div class="range-field" role="group" aria-labelledby="ringDepthGapLabel">
+                  <span id="ringDepthGapLabel">Ring layers</span>
+                  <input id="ringDepthGapRange" type="range" min="60" max="500" step="5" value="100" aria-labelledby="ringDepthGapLabel">
+                  <input id="ringDepthGapInput" type="number" min="60" max="500" step="5" value="100" aria-label="Ring layers value">
+                </div>
+                <div class="range-field" role="group" aria-labelledby="ringNodeGapLabel">
+                  <span id="ringNodeGapLabel">Ring nodes</span>
+                  <input id="ringNodeGapRange" type="range" min="0" max="200" step="4" value="28" aria-labelledby="ringNodeGapLabel">
+                  <input id="ringNodeGapInput" type="number" min="0" max="200" step="4" value="28" aria-label="Ring nodes value">
+                </div>
+                <div class="range-field" role="group" aria-labelledby="nodeFontSizeLabel">
+                  <span id="nodeFontSizeLabel">Font size</span>
+                  <input id="nodeFontSizeRange" type="range" min="9" max="22" step="0.5" value="13" aria-labelledby="nodeFontSizeLabel">
+                  <input id="nodeFontSizeInput" type="number" min="9" max="22" step="0.5" value="13" aria-label="Font size value">
+                </div>
               </div>
             </div>
           </details>

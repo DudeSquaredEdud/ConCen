@@ -82,6 +82,32 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
             raise AssertionError("Command palette returned no results")
         page.keyboard.press("Escape")
 
+        page.locator("#treeViewButton").click()
+        if page.locator("#treeViewButton").get_attribute("aria-pressed") != "true":
+            raise AssertionError("Flat view button did not activate")
+        page.locator("#ringViewButton").click()
+        if page.locator("#ringViewButton").get_attribute("aria-pressed") != "true":
+            raise AssertionError("Ring view button did not activate")
+
+        page.locator("#zoomInButton").click()
+        page.locator("#zoomOutButton").click()
+        page.locator("#fitViewButton").click()
+        if "Fit view" not in (page.locator("#statusText").text_content() or ""):
+            raise AssertionError("Fit view control did not update status")
+
+        page.locator(".settings-menu > summary").click()
+        page.locator("[data-layout-preset='wide']").click()
+        page.wait_for_timeout(150)
+        if page.locator("#ringBaseRadiusInput").input_value() != "155":
+            raise AssertionError("Layout preset did not update number input")
+        if page.locator("#ringBaseRadiusRange").input_value() != "155":
+            raise AssertionError("Layout preset did not update range input")
+        page.locator("#ringNodeGapRange").fill("40")
+        page.wait_for_timeout(150)
+        if page.locator("#ringNodeGapInput").input_value() != "40":
+            raise AssertionError("Range control did not sync number input")
+        page.locator(".settings-menu > summary").click()
+
         page.locator(".mind-menu > summary").click()
         with page.expect_download(timeout=5000) as download_info:
             page.locator("#exportMindButton").click()
@@ -126,8 +152,20 @@ def smoke_mobile(browser_type, browser_name: str, url: str) -> None:
         page.on("pageerror", lambda exc: messages.append(f"pageerror:{exc}"))
         page.goto(url, wait_until="networkidle")
         page.wait_for_selector("#chartCanvas .node", timeout=5000)
+        page.locator("#welcomeCloseButton").click()
         if page.locator("#chartCanvas .node").count() < 1:
             raise AssertionError("Mobile viewport rendered no nodes")
+        page.locator(".settings-menu > summary").click()
+        page.wait_for_selector(".settings-menu[open] .settings-panel", timeout=3000)
+        settings_height = page.locator(".settings-panel").evaluate("el => el.getBoundingClientRect().height")
+        if settings_height < 240:
+            raise AssertionError(f"Mobile settings panel collapsed: {settings_height}")
+        page.locator(".settings-menu > summary").click()
+        page.set_viewport_size({"width": 320, "height": 700})
+        page.wait_for_timeout(150)
+        overflow = page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")
+        if overflow > 1:
+            raise AssertionError(f"Mobile toolbar overflows horizontally by {overflow}px")
         assert_no_browser_messages(messages)
         print(f"{browser_name}: mobile PASS")
     finally:
