@@ -56,7 +56,7 @@
     appearanceDefaults: {
       nodeFontSize: 13,
       stylePreset: "glass",
-      navigationMode: "directional",
+      navigationMode: "outline",
       showStatusMarkers: false,
       showPriorityMarkers: true
     },

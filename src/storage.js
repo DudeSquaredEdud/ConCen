@@ -196,8 +196,9 @@
   }
 
   function normalizeNavigationMode(value) {
-    const mode = String(value || config.appearanceDefaults.navigationMode || "directional");
-    return config.navigationModes[mode] ? mode : "directional";
+    const fallback = config.appearanceDefaults.navigationMode || "outline";
+    const mode = String(value || fallback);
+    return config.navigationModes[mode] ? mode : fallback;
   }
 
   function normalizeBranchColors(input) {

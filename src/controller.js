@@ -1396,7 +1396,7 @@
     const range = this.nodeLinkRange || activeNodeLinkRange(this.el.noteInput);
     if (!range) return;
     const value = this.el.noteInput.value;
-    const replacement = "[[" + node.label + "]]";
+    const replacement = "[[node:" + node.id + "|" + node.label + "]]";
     this.el.noteInput.value = value.slice(0, range.start) + replacement + value.slice(range.end);
     const cursor = range.start + replacement.length;
     this.el.noteInput.setSelectionRange(cursor, cursor);
@@ -1574,6 +1574,7 @@
   };
 
   Controller.prototype.applyWelcomeTemplate = function (template, options) {
+    if (template === "tutorial" && RingMapChart.tutorialSnapshot) return this.applyTutorialSnapshot(options);
     const tree = welcomeTemplateTree(template);
     if (!tree) return false;
     const hasWork = Object.keys(this.mind.nodes).length > 1 || this.currentMindNode()?.label !== "Chart Title";
@@ -1595,6 +1596,33 @@
     this.renderWelcome();
     if (options && options.closeWelcome) this.closeWelcome();
     this.updateStatus("Template loaded");
+    return true;
+  };
+
+  Controller.prototype.applyTutorialSnapshot = function (options) {
+    const snapshot = JSON.parse(JSON.stringify(RingMapChart.tutorialSnapshot));
+    const hasWork = Object.keys(this.mind.nodes).length > 1 || this.currentMindNode()?.label !== "Chart Title";
+    if (hasWork && !confirm("Replace current mind with this tutorial?")) return false;
+    this.pushUndoSnapshot();
+    this.mind = snapshot.mind;
+    this.maps = snapshot.maps;
+    this.activeMapId = this.maps.some((map) => map.id === snapshot.activeMapId) ? snapshot.activeMapId : this.maps[0].id;
+    this.downMapStack = [];
+    this.appearance = storage.normalizeAppearance(snapshot.appearance, config.appearanceDefaults);
+    this.theme = storage.normalizeTheme(snapshot.theme);
+    this.customTheme = storage.normalizeCustomTheme(snapshot.customTheme);
+    this.branchColors = storage.normalizeBranchColors(snapshot.branchColors);
+    this.hideEditor();
+    this.closeNoteSidebar(false);
+    this.actionBarOpen = false;
+    this.cameraReady = false;
+    this.loadMap(this.currentMap());
+    this.save();
+    this.syncControls();
+    this.render();
+    this.renderWelcome();
+    if (options && options.closeWelcome) this.closeWelcome();
+    this.updateStatus("Tutorial loaded");
     return true;
   };
 
@@ -2438,39 +2466,78 @@
     const items = [];
     const seen = new Set();
     const text = String(note || "");
-    const urlPattern = /\bhttps?:\/\/[^\s<>"']+/gi;
+    const wikiPattern = /\[\[([^\]]{1,240})\]\]/g;
+    for (const match of text.matchAll(wikiPattern)) {
+      const link = parseWikiLink(match[1]);
+      if (!link.target) continue;
+      if (isHttpUrl(link.target)) {
+        const href = cleanUrl(link.target);
+        if (seen.has("url:" + href)) continue;
+        seen.add("url:" + href);
+        items.push({ kind: "url", href, label: link.title || href });
+        continue;
+      }
+      const node = linkedNode(link.target, mind);
+      if (!node || seen.has("node:" + node.id)) continue;
+      seen.add("node:" + node.id);
+      items.push({ kind: "node", sourceId: node.id, label: "Node: " + (link.title || node.label) });
+    }
+    const urlPattern = /\bhttps?:\/\/[^\s<>"'\]\|]+/gi;
     for (const match of text.matchAll(urlPattern)) {
-      const href = match[0].replace(/[),.;]+$/, "");
+      const href = cleanUrl(match[0]);
       if (seen.has("url:" + href)) continue;
       seen.add("url:" + href);
       items.push({ kind: "url", href, label: href });
-    }
-    const nodePattern = /\[\[([^\]]{1,80})\]\]/g;
-    for (const match of text.matchAll(nodePattern)) {
-      const label = match[1].trim().toLowerCase();
-      const node = Object.values(mind.nodes).find((item) => item.label.trim().toLowerCase() === label);
-      if (!node || seen.has("node:" + node.id)) continue;
-      seen.add("node:" + node.id);
-      items.push({ kind: "node", sourceId: node.id, label: "Node: " + node.label });
     }
     return items.slice(0, 8);
   }
 
   function backlinkItems(mind, targetNode) {
     const targetLabel = targetNode.label.trim().toLowerCase();
-    if (!targetLabel) return [];
+    if (!targetNode.id || !targetLabel) return [];
     return Object.values(mind.nodes)
-      .filter((node) => node.id !== targetNode.id && noteLinksToLabel(node.note, targetLabel))
+      .filter((node) => node.id !== targetNode.id && noteLinksToNode(node.note, mind, targetNode.id, targetLabel))
       .map((node) => ({ sourceId: node.id, label: node.label }));
   }
 
-  function noteLinksToLabel(note, targetLabel) {
+  function noteLinksToNode(note, mind, targetId, targetLabel) {
     const text = String(note || "");
-    const nodePattern = /\[\[([^\]]{1,80})\]\]/g;
-    for (const match of text.matchAll(nodePattern)) {
-      if (match[1].trim().toLowerCase() === targetLabel) return true;
+    const wikiPattern = /\[\[([^\]]{1,240})\]\]/g;
+    for (const match of text.matchAll(wikiPattern)) {
+      const link = parseWikiLink(match[1]);
+      if (isHttpUrl(link.target)) continue;
+      const node = linkedNode(link.target, mind);
+      if (node && node.id === targetId) return true;
+      if (!node && link.target.trim().toLowerCase() === targetLabel) return true;
     }
     return false;
+  }
+
+  function parseWikiLink(value) {
+    const text = String(value || "").trim();
+    const divider = text.indexOf("|");
+    if (divider < 0) return { target: text, title: "" };
+    return {
+      target: text.slice(0, divider).trim(),
+      title: text.slice(divider + 1).trim()
+    };
+  }
+
+  function linkedNode(target, mind) {
+    const raw = String(target || "").trim();
+    if (!raw) return null;
+    const id = raw.startsWith("node:") ? raw.slice(5).trim() : "";
+    if (id && mind.nodes[id]) return mind.nodes[id];
+    const label = raw.toLowerCase();
+    return Object.values(mind.nodes).find((item) => item.label.trim().toLowerCase() === label) || null;
+  }
+
+  function isHttpUrl(value) {
+    return /^https?:\/\/\S+$/i.test(String(value || "").trim());
+  }
+
+  function cleanUrl(value) {
+    return String(value || "").trim().replace(/[),.;]+$/, "");
   }
 
   function nodeSearchDetail(mind, node) {
