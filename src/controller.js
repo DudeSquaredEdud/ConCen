@@ -4,6 +4,7 @@
   const RingMapChart = global.RingMapChart;
   const { config, model, storage, utils } = RingMapChart;
   const WELCOME_KEY = "ring-map-chart-welcome-v1";
+  const GITHUB_SYNC_KEY = "concen-github-sync-v1";
   const DEFAULT_BRANCH_COLORS = config.colors.slice();
   const LAYOUT_PRESETS = {
     compact: { treeLevelGap: 64, treeLeafGap: 84, ringBaseRadius: 88, ringDepthGap: 76, ringNodeGap: 12 },
@@ -130,6 +131,7 @@
     this.nodeLinkRange = null;
     this.saveStateTimer = null;
     this.recentMinds = [];
+    this.githubSync = loadGithubSyncConfig();
   }
 
   Controller.prototype.start = function () {
@@ -216,6 +218,12 @@
     });
     this.el.exportMindButton.addEventListener("click", () => this.exportMind());
     this.el.importMindInput.addEventListener("change", () => this.importMind());
+    if (this.el.githubSaveSettingsButton) this.el.githubSaveSettingsButton.addEventListener("click", () => this.saveGithubSyncSettings());
+    if (this.el.githubExportSettingsButton) this.el.githubExportSettingsButton.addEventListener("click", () => this.exportGithubSyncSettings());
+    if (this.el.githubImportSettingsInput) this.el.githubImportSettingsInput.addEventListener("change", () => this.importGithubSyncSettings());
+    if (this.el.githubPushButton) this.el.githubPushButton.addEventListener("click", () => this.pushMindToGithub());
+    if (this.el.githubPullButton) this.el.githubPullButton.addEventListener("click", () => this.pullMindFromGithub());
+    if (this.el.githubDisconnectButton) this.el.githubDisconnectButton.addEventListener("click", () => this.disconnectGithubSync());
     if (this.el.clearRecentMindsButton) this.el.clearRecentMindsButton.addEventListener("click", () => this.clearRecentMinds());
     [this.el.mindMenu, this.el.settingsMenu].forEach((menu) => {
       if (!menu) return;
@@ -1039,6 +1047,7 @@
     this.syncSpacingInputs(true);
     this.syncAppearanceInputs(true);
     this.syncStyleControls();
+    this.syncGithubControls();
     this.updateStatus();
   };
 
@@ -1076,6 +1085,22 @@
     Object.entries(this.el.appearanceToggles || {}).forEach(([key, input]) => {
       if (!input) return;
       input.checked = this.appearance[key] !== false;
+    });
+  };
+
+  Controller.prototype.syncGithubControls = function () {
+    if (!this.el.githubOwnerInput) return;
+    const sync = this.githubSync || {};
+    const values = {
+      githubOwnerInput: sync.owner || "",
+      githubRepoInput: sync.repo || "",
+      githubBranchInput: sync.branch || "main",
+      githubPathInput: sync.path || defaultGithubPath(this.mind),
+      githubTokenInput: sync.token || ""
+    };
+    Object.entries(values).forEach(([key, value]) => {
+      const input = this.el[key];
+      if (input && document.activeElement !== input) input.value = value;
     });
   };
 
@@ -1843,6 +1868,8 @@
       { kind: "command", title: "New mind", detail: "Blank document", run: () => this.newMind() },
       { kind: "command", title: "Save mind", detail: "Local autosave", run: () => this.save() },
       { kind: "command", title: "Save copy", detail: ".mind.json", run: () => this.exportMind() },
+      { kind: "command", title: "Push to GitHub", detail: "Commit current mind JSON", run: () => this.pushMindToGithub() },
+      { kind: "command", title: "Pull from GitHub", detail: "Replace current mind from repo", run: () => this.pullMindFromGithub() },
       { kind: "command", title: "Clear recents", detail: "Remove stored snapshots", run: () => this.clearRecentMinds() },
       { kind: "command", title: "Export theme", detail: ".concen-theme.json", run: () => this.exportTheme() },
       { kind: "command", title: "Toggle notes", detail: "Ctrl+Enter or Ctrl+click", run: () => this.toggleNoteSidebar() },
@@ -2144,19 +2171,7 @@
   };
 
   Controller.prototype.exportMind = function () {
-    this.captureActiveMap();
-    const payload = {
-      type: "concen-mind",
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      mind: this.mind,
-      maps: this.maps,
-      activeMapId: this.activeMapId,
-      appearance: this.appearance,
-      theme: this.theme,
-      customTheme: this.customTheme,
-      branchColors: this.branchColors
-    };
+    const payload = this.mindExportPayload();
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -2169,6 +2184,49 @@
     this.updateStatus("Mind copy saved");
   };
 
+  Controller.prototype.mindExportPayload = function () {
+    this.captureActiveMap();
+    return {
+      type: "concen-mind",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      mind: this.mind,
+      maps: this.maps,
+      activeMapId: this.activeMapId,
+      appearance: this.appearance,
+      theme: this.theme,
+      customTheme: this.customTheme,
+      branchColors: this.branchColors
+    };
+  };
+
+  Controller.prototype.applyMindPayload = function (parsed) {
+    const previous = localStorage.getItem(config.storageKey);
+    try {
+      localStorage.setItem(config.storageKey, JSON.stringify(parsed));
+      const loaded = storage.load();
+      if (!loaded) throw new Error("Invalid mind file");
+      this.rememberCurrentMind();
+      this.mind = loaded.mind;
+      this.maps = loaded.maps;
+      this.activeMapId = loaded.activeMapId;
+      this.appearance = storage.normalizeAppearance(loaded.appearance, config.appearanceDefaults);
+      this.theme = loaded.theme;
+      this.customTheme = storage.normalizeCustomTheme(loaded.customTheme);
+      this.branchColors = storage.normalizeBranchColors(loaded.branchColors);
+      this.hideEditor();
+      this.loadMap(this.currentMap());
+      this.save();
+      this.syncControls();
+      this.render();
+      return true;
+    } catch (error) {
+      if (previous === null) localStorage.removeItem(config.storageKey);
+      else localStorage.setItem(config.storageKey, previous);
+      return false;
+    }
+  };
+
   Controller.prototype.importMind = function () {
     const file = this.el.importMindInput.files && this.el.importMindInput.files[0];
     if (!file) return;
@@ -2178,34 +2236,133 @@
       return;
     }
     file.text().then((raw) => {
-      const previous = localStorage.getItem(config.storageKey);
       try {
         const parsed = JSON.parse(raw);
-        localStorage.setItem(config.storageKey, JSON.stringify(parsed));
-        const loaded = storage.load();
-        if (!loaded) throw new Error("Invalid mind file");
-        this.rememberCurrentMind();
-        this.mind = loaded.mind;
-        this.maps = loaded.maps;
-        this.activeMapId = loaded.activeMapId;
-        this.appearance = storage.normalizeAppearance(loaded.appearance, config.appearanceDefaults);
-        this.theme = loaded.theme;
-        this.customTheme = storage.normalizeCustomTheme(loaded.customTheme);
-        this.branchColors = storage.normalizeBranchColors(loaded.branchColors);
-        this.hideEditor();
-        this.loadMap(this.currentMap());
-        this.save();
-        this.syncControls();
-        this.render();
+        if (!this.applyMindPayload(parsed)) throw new Error("Invalid mind file");
         this.updateStatus("Mind opened");
       } catch (error) {
-        if (previous === null) localStorage.removeItem(config.storageKey);
-        else localStorage.setItem(config.storageKey, previous);
         this.updateStatus("Import failed");
       } finally {
         this.el.importMindInput.value = "";
       }
     });
+  };
+
+  Controller.prototype.saveGithubSyncSettings = function () {
+    const next = githubSyncFromInputs(this.el, this.githubSync, this.mind);
+    if (!next.owner || !next.repo || !next.path || !next.token) {
+      this.updateStatus("GitHub sync needs owner, repo, path, token");
+      return;
+    }
+    this.githubSync = next;
+    saveGithubSyncConfig(this.githubSync);
+    this.syncGithubControls();
+    this.updateStatus("GitHub sync saved");
+  };
+
+  Controller.prototype.exportGithubSyncSettings = function () {
+    const sync = githubSyncFromInputs(this.el, this.githubSync, this.mind);
+    if (!sync.owner || !sync.repo || !sync.path) {
+      this.updateStatus("GitHub settings need owner, repo, path");
+      return;
+    }
+    this.githubSync = sync;
+    saveGithubSyncConfig(this.githubSync);
+    const payload = githubSyncSettingsPayload(sync);
+    const blob = new Blob([JSON.stringify(payload, null, 2) + "\n"], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = githubSettingsFilename(sync);
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    this.updateStatus("GitHub settings downloaded");
+  };
+
+  Controller.prototype.importGithubSyncSettings = function () {
+    const input = this.el.githubImportSettingsInput;
+    const file = input && input.files && input.files[0];
+    if (!file) return;
+    file.text().then((raw) => {
+      try {
+        const parsed = JSON.parse(raw);
+        const imported = githubSyncFromSettingsPayload(parsed);
+        if (!imported.owner || !imported.repo || !imported.path) throw new Error("Invalid GitHub settings");
+        this.githubSync = normalizeGithubSyncConfig(Object.assign({}, imported, {
+          token: imported.token || this.githubSync.token || "",
+          sha: imported.sha || this.githubSync.sha || ""
+        }), this.mind);
+        saveGithubSyncConfig(this.githubSync);
+        this.syncGithubControls();
+        this.updateStatus(this.githubSync.token ? "GitHub settings opened" : "GitHub settings opened; token needed");
+      } catch (error) {
+        this.updateStatus("GitHub settings open failed");
+      } finally {
+        input.value = "";
+      }
+    });
+  };
+
+  Controller.prototype.disconnectGithubSync = function () {
+    if (!confirm("Disconnect GitHub sync from this browser?")) return;
+    this.githubSync = defaultGithubSyncConfig(this.mind);
+    saveGithubSyncConfig(this.githubSync);
+    this.syncGithubControls();
+    this.updateStatus("GitHub sync disconnected");
+  };
+
+  Controller.prototype.pushMindToGithub = function () {
+    const sync = this.readGithubSyncSettings();
+    if (!sync) return;
+    const payload = this.mindExportPayload();
+    const content = JSON.stringify(payload, null, 2) + "\n";
+    this.updateStatus("Pushing to GitHub");
+    githubGetContent(sync).then((remote) => {
+      if (remote && sync.sha && remote.sha !== sync.sha && !confirm("Remote mind changed since last pull. Push over remote copy?")) {
+        this.updateStatus("GitHub push cancelled");
+        return null;
+      }
+      return githubPutContent(sync, content, remote && remote.sha, `Update ${sync.path}`);
+    }).then((result) => {
+      if (!result) return;
+      this.githubSync = Object.assign({}, sync, { sha: result.content && result.content.sha || "" });
+      saveGithubSyncConfig(this.githubSync);
+      this.syncGithubControls();
+      this.updateStatus("GitHub push complete");
+    }).catch((error) => {
+      this.updateStatus(githubErrorMessage(error, "GitHub push failed"));
+    });
+  };
+
+  Controller.prototype.pullMindFromGithub = function () {
+    const sync = this.readGithubSyncSettings();
+    if (!sync) return;
+    if (!confirm("Pull GitHub mind and replace current browser mind?")) return;
+    this.updateStatus("Pulling from GitHub");
+    githubGetContent(sync).then((remote) => {
+      if (!remote || !remote.content) throw new Error("GitHub file not found");
+      const parsed = JSON.parse(decodeBase64Unicode(remote.content));
+      if (!this.applyMindPayload(parsed)) throw new Error("Invalid GitHub mind");
+      this.githubSync = Object.assign({}, sync, { sha: remote.sha || "" });
+      saveGithubSyncConfig(this.githubSync);
+      this.syncGithubControls();
+      this.updateStatus("GitHub pull complete");
+    }).catch((error) => {
+      this.updateStatus(githubErrorMessage(error, "GitHub pull failed"));
+    });
+  };
+
+  Controller.prototype.readGithubSyncSettings = function () {
+    const next = githubSyncFromInputs(this.el, this.githubSync, this.mind);
+    if (!next.owner || !next.repo || !next.path || !next.token) {
+      this.updateStatus("GitHub sync needs owner, repo, path, token");
+      return null;
+    }
+    this.githubSync = next;
+    saveGithubSyncConfig(this.githubSync);
+    return next;
   };
 
   Controller.prototype.clearRecentMinds = function () {
@@ -2660,6 +2817,185 @@
   function mindFilename(label) {
     const slug = utils.cleanId(label.toLowerCase().replace(/\s+/g, "-"), "mind");
     return slug + ".mind.json";
+  }
+
+  function githubSettingsFilename(sync) {
+    const bits = [sync.owner, sync.repo].filter(Boolean).join("-");
+    const slug = utils.cleanId((bits || "github-sync").toLowerCase().replace(/\s+/g, "-"), "github-sync");
+    return slug + ".concen-github-sync.json";
+  }
+
+  function defaultGithubPath(mind) {
+    const label = mind && mind.nodes && mind.nodes[mind.rootId] ? mind.nodes[mind.rootId].label : "concen";
+    return "minds/" + mindFilename(label);
+  }
+
+  function defaultGithubSyncConfig(mind) {
+    return { owner: "", repo: "", branch: "main", path: defaultGithubPath(mind), token: "", sha: "" };
+  }
+
+  function githubSyncSettingsPayload(sync) {
+    const normalized = normalizeGithubSyncConfig(sync, null);
+    return {
+      type: "concen-github-sync",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      owner: normalized.owner,
+      repo: normalized.repo,
+      branch: normalized.branch,
+      path: normalized.path,
+      sha: normalized.sha
+    };
+  }
+
+  function githubSyncFromSettingsPayload(payload) {
+    const source = payload && typeof payload === "object" && payload.type === "concen-github-sync" ? payload : {};
+    return normalizeGithubSyncConfig({
+      owner: source.owner,
+      repo: source.repo,
+      branch: source.branch,
+      path: source.path,
+      token: source.token,
+      sha: source.sha
+    }, null);
+  }
+
+  function loadGithubSyncConfig() {
+    try {
+      const raw = localStorage.getItem(GITHUB_SYNC_KEY);
+      if (!raw) return defaultGithubSyncConfig(null);
+      return normalizeGithubSyncConfig(JSON.parse(raw), null);
+    } catch (error) {
+      return defaultGithubSyncConfig(null);
+    }
+  }
+
+  function saveGithubSyncConfig(sync) {
+    try {
+      localStorage.setItem(GITHUB_SYNC_KEY, JSON.stringify(normalizeGithubSyncConfig(sync, null)));
+    } catch (error) {
+      return false;
+    }
+    return true;
+  }
+
+  function githubSyncFromInputs(el, previous, mind) {
+    return normalizeGithubSyncConfig({
+      owner: el.githubOwnerInput ? el.githubOwnerInput.value : previous && previous.owner,
+      repo: el.githubRepoInput ? el.githubRepoInput.value : previous && previous.repo,
+      branch: el.githubBranchInput ? el.githubBranchInput.value : previous && previous.branch,
+      path: el.githubPathInput ? el.githubPathInput.value : previous && previous.path,
+      token: el.githubTokenInput ? el.githubTokenInput.value : previous && previous.token,
+      sha: previous && previous.sha
+    }, mind);
+  }
+
+  function normalizeGithubSyncConfig(input, mind) {
+    const fallback = defaultGithubSyncConfig(mind);
+    const sync = input && typeof input === "object" ? input : {};
+    return {
+      owner: cleanGithubPart(sync.owner),
+      repo: cleanGithubPart(sync.repo),
+      branch: cleanGithubBranch(sync.branch || fallback.branch),
+      path: cleanGithubPath(sync.path || fallback.path),
+      token: String(sync.token || "").trim(),
+      sha: /^[0-9a-f]{40}$/i.test(String(sync.sha || "")) ? String(sync.sha) : ""
+    };
+  }
+
+  function cleanGithubPart(value) {
+    return String(value || "").trim().replace(/^\/+|\/+$/g, "");
+  }
+
+  function cleanGithubBranch(value) {
+    return String(value || "main").trim().replace(/^\/+|\/+$/g, "") || "main";
+  }
+
+  function cleanGithubPath(value) {
+    return String(value || "").trim().replace(/^\/+/, "").replace(/\/+/g, "/");
+  }
+
+  function githubContentUrl(sync) {
+    const path = sync.path.split("/").map(encodeURIComponent).join("/");
+    const owner = encodeURIComponent(sync.owner);
+    const repo = encodeURIComponent(sync.repo);
+    const branch = encodeURIComponent(sync.branch || "main");
+    return `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
+  }
+
+  function githubWriteUrl(sync) {
+    const path = sync.path.split("/").map(encodeURIComponent).join("/");
+    const owner = encodeURIComponent(sync.owner);
+    const repo = encodeURIComponent(sync.repo);
+    return `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+  }
+
+  function githubHeaders(sync) {
+    return {
+      Accept: "application/vnd.github+json",
+      Authorization: "Bearer " + sync.token,
+      "X-GitHub-Api-Version": "2022-11-28"
+    };
+  }
+
+  function githubGetContent(sync) {
+    return fetch(githubContentUrl(sync), { headers: githubHeaders(sync) }).then((response) => {
+      if (response.status === 404) return null;
+      if (!response.ok) return githubResponseError(response, "GET");
+      return response.json();
+    });
+  }
+
+  function githubPutContent(sync, content, sha, message) {
+    const body = {
+      message,
+      content: encodeBase64Unicode(content),
+      branch: sync.branch || "main"
+    };
+    if (sha) body.sha = sha;
+    return fetch(githubWriteUrl(sync), {
+      method: "PUT",
+      headers: Object.assign({ "Content-Type": "application/json" }, githubHeaders(sync)),
+      body: JSON.stringify(body)
+    }).then((response) => {
+      if (!response.ok) return githubResponseError(response, "PUT");
+      return response.json();
+    });
+  }
+
+  function githubResponseError(response, method) {
+    return response.json().catch(() => ({})).then((body) => {
+      const detail = body && body.message ? ": " + body.message : "";
+      throw new Error(`GitHub ${method} ${response.status}${detail}`);
+    });
+  }
+
+  function encodeBase64Unicode(value) {
+    const bytes = new TextEncoder().encode(String(value || ""));
+    let binary = "";
+    bytes.forEach((byte) => {
+      binary += String.fromCharCode(byte);
+    });
+    return btoa(binary);
+  }
+
+  function decodeBase64Unicode(value) {
+    const binary = atob(String(value || "").replace(/\s/g, ""));
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return new TextDecoder().decode(bytes);
+  }
+
+  function githubErrorMessage(error, fallback) {
+    const message = error && error.message || "";
+    if (/401|403/.test(message)) return "GitHub auth failed";
+    if (/PUT 404/.test(message)) return "GitHub push 404: check repo access, token Contents write, and branch";
+    if (/GET 404/.test(message)) return "GitHub pull 404: file/repo/branch not found";
+    if (/409/.test(message)) return "GitHub conflict";
+    if (/422/.test(message)) return "GitHub rejected path or branch";
+    return fallback;
   }
 
   function themeFilename(label) {

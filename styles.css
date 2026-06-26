@@ -896,7 +896,9 @@ button,
 }
 
 .command-panel button::before,
+.github-sync > summary::before,
 .import-mind::before,
+.github-import-settings::before,
 .import-theme::before {
   content: attr(data-icon);
   display: grid;
@@ -912,6 +914,7 @@ button,
 
 button:hover,
 .import-mind:hover,
+.github-import-settings:hover,
 .import-theme:hover,
 .settings-menu summary:hover {
   background: var(--control-hover);
@@ -937,6 +940,7 @@ button:disabled:hover {
 }
 
 .import-mind,
+.github-import-settings,
 .import-theme {
   position: relative;
   display: inline-flex;
@@ -945,6 +949,7 @@ button:disabled:hover {
 }
 
 .import-mind input,
+.github-import-settings input,
 .import-theme input {
   position: absolute;
   inset: 0;
@@ -995,12 +1000,82 @@ button:disabled:hover {
 }
 
 .command-panel button,
-.command-panel .import-mind {
+.command-panel .import-mind,
+.command-panel .github-import-settings,
+.command-panel .github-sync > summary {
   width: 100%;
   justify-content: flex-start;
   text-align: left;
   min-height: 34px;
   line-height: 1;
+}
+
+.github-sync {
+  width: 100%;
+}
+
+.github-sync > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: var(--control);
+  color: var(--control-ink);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.github-sync > summary::-webkit-details-marker {
+  display: none;
+}
+
+.github-sync-panel {
+  display: grid;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--surface-recessed);
+}
+
+.github-sync-panel label {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: var(--label);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.github-sync-panel .github-import-settings {
+  grid-template-columns: auto minmax(0, 1fr);
+  color: var(--control-ink);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.github-sync-panel input {
+  min-width: 0;
+  height: 28px;
+  border: 1px solid var(--glass-border);
+  border-radius: 7px;
+  padding: 0 8px;
+  color: var(--ink);
+  background: var(--field);
+}
+
+.github-sync-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
 }
 
 .mode-toggle {

@@ -67,6 +67,42 @@
                 <span>Open Mind</span>
                 <input id="importMindInput" type="file" accept="application/json,.json">
               </label>
+              <details class="github-sync">
+                <summary data-icon="⌁">GitHub Sync</summary>
+                <div class="github-sync-panel">
+                  <label>
+                    <span>Owner</span>
+                    <input id="githubOwnerInput" type="text" autocomplete="off" placeholder="github-user">
+                  </label>
+                  <label>
+                    <span>Repo</span>
+                    <input id="githubRepoInput" type="text" autocomplete="off" placeholder="private-minds">
+                  </label>
+                  <label>
+                    <span>Branch</span>
+                    <input id="githubBranchInput" type="text" autocomplete="off" placeholder="main">
+                  </label>
+                  <label>
+                    <span>Path</span>
+                    <input id="githubPathInput" type="text" autocomplete="off" placeholder="minds/concen.mind.json">
+                  </label>
+                  <label>
+                    <span>Token</span>
+                    <input id="githubTokenInput" type="password" autocomplete="off" placeholder="Fine-grained token">
+                  </label>
+                  <div class="github-sync-actions">
+                    <button id="githubSaveSettingsButton" type="button" data-icon="✓">Save</button>
+                    <button id="githubExportSettingsButton" type="button" data-icon="⇧">Download Settings</button>
+                    <label class="github-import-settings" data-icon="⇩">
+                      <span>Open Settings</span>
+                      <input id="githubImportSettingsInput" type="file" accept="application/json,.json">
+                    </label>
+                    <button id="githubPushButton" type="button" data-icon="⇧">Push</button>
+                    <button id="githubPullButton" type="button" data-icon="⇩">Pull</button>
+                    <button id="githubDisconnectButton" type="button" data-icon="×">Disconnect</button>
+                  </div>
+                </div>
+              </details>
               <button id="clearRecentMindsButton" type="button" data-icon="⌫">Clear Recents</button>
               <button id="deleteMapButton" type="button" class="quiet-danger" data-icon="−">Delete Map</button>
               <button id="resetButton" type="button" class="quiet-danger" data-icon="×">Reset Mind</button>

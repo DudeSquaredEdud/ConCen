@@ -7,10 +7,12 @@ import argparse
 import contextlib
 import functools
 import http.server
+import json
 import os
 import socket
 import socketserver
 import sys
+import tempfile
 import threading
 from pathlib import Path
 
@@ -178,6 +180,38 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
         if page.locator("#commandResults button").count() < 1:
             raise AssertionError("Command palette returned no results")
         page.keyboard.press("Escape")
+
+        page.locator(".mind-menu > summary").click()
+        page.locator(".github-sync > summary").click()
+        page.wait_for_selector("#githubOwnerInput", timeout=3000)
+        page.locator("#githubOwnerInput").fill("octocat")
+        page.locator("#githubRepoInput").fill("private-minds")
+        page.locator("#githubPathInput").fill("minds/smoke.mind.json")
+        if page.locator("#githubPushButton").count() != 1 or page.locator("#githubPullButton").count() != 1:
+            raise AssertionError("GitHub sync controls did not render")
+        with page.expect_download(timeout=5000) as sync_download_info:
+            page.locator("#githubExportSettingsButton").click()
+        sync_download = sync_download_info.value
+        if not sync_download.suggested_filename.endswith(".concen-github-sync.json"):
+            raise AssertionError(f"Unexpected GitHub settings filename: {sync_download.suggested_filename}")
+        with tempfile.NamedTemporaryFile("w", suffix=".concen-github-sync.json", delete=False) as settings_file:
+            json.dump({
+                "type": "concen-github-sync",
+                "version": 1,
+                "owner": "monalisa",
+                "repo": "shared-minds",
+                "branch": "main",
+                "path": "minds/imported.mind.json"
+            }, settings_file)
+            settings_path = settings_file.name
+        try:
+            page.locator("#githubImportSettingsInput").set_input_files(settings_path)
+            page.wait_for_timeout(250)
+            if page.locator("#githubOwnerInput").input_value() != "monalisa":
+                raise AssertionError("GitHub settings import did not update owner")
+        finally:
+            Path(settings_path).unlink(missing_ok=True)
+        page.locator(".mind-menu > summary").click()
 
         page.locator(".settings-menu > summary").click()
         page.wait_for_selector(".settings-menu[open] .settings-panel", timeout=3000)
