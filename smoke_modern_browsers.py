@@ -20,6 +20,38 @@ from playwright.sync_api import sync_playwright
 
 
 ROOT = Path(__file__).resolve().parent
+THEME_OWNED_TOKENS = [
+    "--bg",
+    "--surface",
+    "--surface-solid",
+    "--surface-raised",
+    "--surface-recessed",
+    "--glass-border",
+    "--hairline",
+    "--field",
+    "--field-hover",
+    "--control",
+    "--control-hover",
+    "--control-pressed",
+    "--control-ink",
+    "--focus",
+    "--focus-soft",
+    "--path-glow",
+    "--path-fill",
+    "--sibling-glow",
+    "--sibling-fill",
+    "--ink",
+    "--muted",
+    "--label",
+    "--canvas-bg",
+    "--canvas-grid",
+    "--canvas-wash",
+    "--node-fill",
+    "--node-ink",
+    "--root-node-fill",
+    "--root-node-ink",
+    "--ring-guide",
+]
 
 
 class QuietHandler(http.server.SimpleHTTPRequestHandler):
@@ -45,6 +77,50 @@ def start_server() -> tuple[socketserver.TCPServer, str]:
 def assert_no_browser_messages(messages: list[str]) -> None:
     if messages:
         raise AssertionError("Browser errors/warnings:\n" + "\n".join(messages))
+
+
+def exercise_appearance_presets(page, *, check_overflow: bool = False) -> None:
+    page.locator(".settings-menu > summary").click()
+    page.wait_for_selector(".settings-menu[open] .settings-panel", timeout=3000)
+    theme_values = page.locator("#themePresetInput option").evaluate_all("options => options.map(option => option.value)")
+    style_values = page.locator("#stylePresetInput option").evaluate_all("options => options.map(option => option.value)")
+    for theme in theme_values:
+        if theme == "custom":
+            continue
+        page.locator("#themePresetInput").select_option(theme)
+        page.wait_for_timeout(50)
+        if page.locator("#themePresetInput").input_value() != theme:
+            raise AssertionError(f"Theme preset did not stick: {theme}")
+        if page.evaluate("document.documentElement.dataset.theme") not in {"light", "dark"}:
+            raise AssertionError(f"Theme preset did not set color scheme: {theme}")
+        theme_tokens = page.evaluate(
+            """tokens => Object.fromEntries(tokens.map(token => [
+                token,
+                getComputedStyle(document.documentElement).getPropertyValue(token).trim()
+            ]))""",
+            THEME_OWNED_TOKENS,
+        )
+        for style in style_values:
+            page.locator("#stylePresetInput").select_option(style)
+            page.wait_for_timeout(50)
+            if page.evaluate("document.documentElement.dataset.style") != style:
+                raise AssertionError(f"Style preset did not set dataset: {style}")
+            if page.locator("#chartCanvas .node").count() < 1:
+                raise AssertionError(f"Style preset rendered no nodes: {style}")
+            after_tokens = page.evaluate(
+                """tokens => Object.fromEntries(tokens.map(token => [
+                    token,
+                    getComputedStyle(document.documentElement).getPropertyValue(token).trim()
+                ]))""",
+                THEME_OWNED_TOKENS,
+            )
+            if after_tokens != theme_tokens:
+                raise AssertionError(f"Style {style} changed theme tokens for {theme}: {after_tokens} != {theme_tokens}")
+    if check_overflow:
+        overflow = page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")
+        if overflow > 1:
+            raise AssertionError(f"Appearance controls overflow horizontally by {overflow}px")
+    page.locator(".settings-menu > summary").click()
 
 
 def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
@@ -107,6 +183,7 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
         if page.locator("#ringNodeGapInput").input_value() != "40":
             raise AssertionError("Range control did not sync number input")
         page.locator(".settings-menu > summary").click()
+        exercise_appearance_presets(page)
 
         page.locator(".mind-menu > summary").click()
         with page.expect_download(timeout=5000) as download_info:
@@ -161,6 +238,7 @@ def smoke_mobile(browser_type, browser_name: str, url: str) -> None:
         if settings_height < 240:
             raise AssertionError(f"Mobile settings panel collapsed: {settings_height}")
         page.locator(".settings-menu > summary").click()
+        exercise_appearance_presets(page, check_overflow=True)
         page.set_viewport_size({"width": 320, "height": 700})
         page.wait_for_timeout(150)
         overflow = page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")

@@ -10,11 +10,43 @@
     balanced: { treeLevelGap: 82, treeLeafGap: 110, ringBaseRadius: 110, ringDepthGap: 100, ringNodeGap: 28 },
     wide: { treeLevelGap: 118, treeLeafGap: 160, ringBaseRadius: 155, ringDepthGap: 145, ringNodeGap: 58 }
   };
+  const THEME_COLOR_TOKEN_KEYS = [
+    "bg",
+    "surface",
+    "surface-solid",
+    "surface-raised",
+    "surface-recessed",
+    "glass-border",
+    "hairline",
+    "field",
+    "field-hover",
+    "control",
+    "control-hover",
+    "control-pressed",
+    "control-ink",
+    "focus",
+    "focus-soft",
+    "path-glow",
+    "path-fill",
+    "sibling-glow",
+    "sibling-fill",
+    "ink",
+    "muted",
+    "label",
+    "canvas-bg",
+    "canvas-grid",
+    "canvas-wash",
+    "ring-guide",
+    "node-fill",
+    "node-ink",
+    "root-node-fill",
+    "root-node-ink"
+  ];
   const MANAGED_THEME_TOKEN_KEYS = Array.from(new Set(
     Object.values(config.themePresets)
       .flatMap((preset) => Object.keys(preset.tokens))
       .concat(config.themeTokenControls.map((control) => control.key))
-      .concat(["canvas-grid", "label", "node-ink", "root-node-ink"])
+      .concat(THEME_COLOR_TOKEN_KEYS)
   ));
   const MANAGED_STYLE_TOKEN_KEYS = [
     "bg",
@@ -32,6 +64,10 @@
     "control-ink",
     "focus",
     "focus-soft",
+    "path-glow",
+    "path-fill",
+    "sibling-glow",
+    "sibling-fill",
     "ink",
     "muted",
     "label",
@@ -51,6 +87,7 @@
 
   function Controller(elements) {
     this.el = elements;
+    this.el.welcomeModePacks = this.el.welcomeModePacks || document.getElementById("welcomeModePacks");
     this.layoutEngine = RingMapChart.createLayoutEngine();
     this.renderer = new RingMapChart.Renderer(elements.svg, this.layoutEngine);
     this.spacing = storage.normalizeSpacing(null, config.spacingDefaults);
@@ -172,6 +209,10 @@
     if (this.el.welcomeStyles) this.el.welcomeStyles.addEventListener("click", (event) => {
       const button = event.target.closest && event.target.closest("button[data-style]");
       if (button) this.applyWelcomeStyle(button.dataset.style);
+    });
+    if (this.el.welcomeModePacks) this.el.welcomeModePacks.addEventListener("click", (event) => {
+      const button = event.target.closest && event.target.closest("button[data-mode-pack]");
+      if (button) this.applyModePack(button.dataset.modePack);
     });
     this.el.exportMindButton.addEventListener("click", () => this.exportMind());
     this.el.importMindInput.addEventListener("change", () => this.importMind());
@@ -1081,7 +1122,7 @@
 
   Controller.prototype.applyTheme = function () {
     const preset = config.themePresets[this.theme] || config.themePresets.light;
-    const tokens = this.theme === "custom" ? Object.assign({}, preset.tokens, this.customTheme) : preset.tokens;
+    const tokens = completeThemeTokens(this.theme === "custom" ? Object.assign({}, preset.tokens, this.customTheme) : preset.tokens);
     const colorScheme = this.theme === "custom" ? inferColorScheme(tokens.bg) : preset.colorScheme;
     document.documentElement.dataset.theme = colorScheme === "dark" ? "dark" : "light";
     document.documentElement.style.colorScheme = colorScheme;
@@ -1104,18 +1145,18 @@
   Controller.prototype.applyStyleOverrides = function () {
     const style = storage.normalizeStylePreset(this.appearance.stylePreset);
     const tokens = styleTokens(style, document.documentElement.dataset.theme === "dark");
+    const styleOnlyKeys = MANAGED_STYLE_TOKEN_KEYS.filter((key) => !MANAGED_THEME_TOKEN_KEYS.includes(key));
     if (!tokens) {
-      MANAGED_STYLE_TOKEN_KEYS
-        .filter((key) => !MANAGED_THEME_TOKEN_KEYS.includes(key))
-        .forEach((key) => {
-          document.documentElement.style.removeProperty("--" + key);
-        });
+      styleOnlyKeys.forEach((key) => {
+        document.documentElement.style.removeProperty("--" + key);
+      });
       return;
     }
-    MANAGED_STYLE_TOKEN_KEYS.forEach((key) => {
+    styleOnlyKeys.forEach((key) => {
       document.documentElement.style.removeProperty("--" + key);
     });
     Object.entries(tokens).forEach(([key, value]) => {
+      if (MANAGED_THEME_TOKEN_KEYS.includes(key)) return;
       document.documentElement.style.setProperty("--" + key, value);
     });
   };
@@ -1614,6 +1655,28 @@
     this.syncControls();
     this.renderWelcome();
     this.updateStatus(`Style: ${config.stylePresets[this.appearance.stylePreset].label}`);
+  };
+
+  Controller.prototype.applyModePack = function (packName) {
+    const pack = config.modePacks && config.modePacks[packName];
+    if (!pack) return false;
+    this.theme = storage.normalizeTheme(pack.theme);
+    this.appearance = storage.normalizeAppearance(Object.assign({}, this.appearance, {
+      nodeFontSize: pack.nodeFontSize,
+      stylePreset: pack.stylePreset,
+      navigationMode: pack.navigationMode
+    }), config.appearanceDefaults);
+    this.spacing = storage.normalizeSpacing(Object.assign({}, this.spacing, pack.spacing || {}), config.spacingDefaults);
+    this.viewMode = pack.viewMode === "tree" ? "tree" : "ring";
+    this.shouldRevealFocus = true;
+    this.applyTheme();
+    this.applyAppearance();
+    this.save();
+    this.syncControls();
+    this.render();
+    this.renderWelcome();
+    this.updateStatus("Mode: " + pack.label);
+    return true;
   };
 
   Controller.prototype.applyWelcomeTemplate = function (template, options) {
@@ -2553,6 +2616,36 @@
     return (red * 299 + green * 587 + blue * 114) / 1000 > 140 ? "light" : "dark";
   }
 
+  function completeThemeTokens(input) {
+    const tokens = Object.assign({}, input);
+    const surface = tokens["surface-solid"] || tokens["canvas-bg"] || tokens.bg;
+    const canvas = tokens["canvas-bg"] || tokens.bg;
+    const focus = tokens.focus || tokens["root-node-fill"] || "#0a84ff";
+    tokens.label = tokens.label || tokens.muted || tokens.ink;
+    tokens.surface = tokens.surface || `color-mix(in srgb, ${surface} 72%, transparent)`;
+    tokens["surface-raised"] = tokens["surface-raised"] || `color-mix(in srgb, ${surface} 88%, transparent)`;
+    tokens["surface-recessed"] = tokens["surface-recessed"] || `color-mix(in srgb, ${canvas} 88%, transparent)`;
+    tokens["glass-border"] = tokens["glass-border"] || `color-mix(in srgb, ${tokens.muted || tokens.ink} 26%, transparent)`;
+    tokens.hairline = tokens.hairline || `color-mix(in srgb, ${tokens.muted || tokens.ink} 16%, transparent)`;
+    tokens.field = tokens.field || `color-mix(in srgb, ${surface} 86%, transparent)`;
+    tokens["field-hover"] = tokens["field-hover"] || surface;
+    tokens.control = tokens.control || `linear-gradient(180deg, ${surface}, ${canvas})`;
+    tokens["control-hover"] = tokens["control-hover"] || `linear-gradient(180deg, ${surface}, color-mix(in srgb, ${canvas} 86%, ${focus}))`;
+    tokens["control-pressed"] = tokens["control-pressed"] || `linear-gradient(180deg, ${canvas}, ${surface})`;
+    tokens["control-ink"] = tokens["control-ink"] || tokens.ink;
+    tokens.focus = focus;
+    tokens["focus-soft"] = tokens["focus-soft"] || `color-mix(in srgb, ${focus} 22%, transparent)`;
+    tokens["path-glow"] = tokens["path-glow"] || `color-mix(in srgb, ${focus} 28%, transparent)`;
+    tokens["path-fill"] = tokens["path-fill"] || `color-mix(in srgb, ${focus} 6%, transparent)`;
+    tokens["sibling-glow"] = tokens["sibling-glow"] || `color-mix(in srgb, ${tokens.muted || focus} 22%, transparent)`;
+    tokens["sibling-fill"] = tokens["sibling-fill"] || `color-mix(in srgb, ${tokens.muted || focus} 6%, transparent)`;
+    tokens["canvas-wash"] = tokens["canvas-wash"] || `color-mix(in srgb, ${surface} 58%, transparent)`;
+    tokens["canvas-grid"] = tokens["canvas-grid"] || tokens["ring-guide"];
+    tokens["node-ink"] = tokens["node-ink"] || tokens.ink;
+    tokens["root-node-ink"] = tokens["root-node-ink"] || tokens.ink;
+    return tokens;
+  }
+
   function noteLinkItems(note, mind) {
     const items = [];
     const seen = new Set();
@@ -2758,7 +2851,257 @@
     if (style === "papery") return dark ? darkPaperyTokens() : lightPaperyTokens();
     if (style === "blueprint") return blueprintTokens();
     if (style === "terminal") return terminalTokens();
+    if (style === "index-card") return indexCardTokens(dark);
+    if (style === "radar") return radarTokens();
+    if (style === "kanban") return kanbanTokens(dark);
+    if (style === "schematic") return schematicTokens(dark);
     return null;
+  }
+
+  function indexCardTokens(dark) {
+    return dark ? {
+      bg: "#151514",
+      surface: "rgba(37, 36, 33, 0.78)",
+      "surface-solid": "#252421",
+      "surface-raised": "rgba(48, 46, 42, 0.92)",
+      "surface-recessed": "rgba(30, 29, 26, 0.9)",
+      "glass-border": "rgba(239, 232, 209, 0.16)",
+      hairline: "rgba(239, 232, 209, 0.12)",
+      field: "rgba(36, 34, 31, 0.94)",
+      "field-hover": "rgba(48, 45, 40, 0.96)",
+      control: "linear-gradient(180deg, rgba(57, 54, 48, 0.92), rgba(40, 38, 34, 0.94))",
+      "control-hover": "linear-gradient(180deg, rgba(67, 63, 56, 0.96), rgba(48, 45, 40, 0.98))",
+      "control-pressed": "linear-gradient(180deg, rgba(34, 32, 29, 0.98), rgba(58, 54, 48, 0.94))",
+      "control-ink": "#f4ecd7",
+      focus: "#d8a545",
+      "focus-soft": "rgba(216, 165, 69, 0.24)",
+      "path-glow": "rgba(216, 165, 69, 0.3)",
+      "path-fill": "rgba(216, 165, 69, 0.08)",
+      "sibling-glow": "rgba(118, 169, 133, 0.2)",
+      "sibling-fill": "rgba(118, 169, 133, 0.06)",
+      ink: "#f4ecd7",
+      muted: "#c4b696",
+      label: "#ad9e7d",
+      "canvas-bg": "#211f1a",
+      "canvas-grid": "rgba(244, 236, 215, 0.055)",
+      "canvas-wash": "rgba(76, 68, 48, 0.3)",
+      "ring-guide": "rgba(216, 165, 69, 0.23)",
+      "node-fill": "rgba(46, 43, 36, 0.94)",
+      "node-ink": "#f7efd9",
+      "root-node-fill": "#d8a545",
+      "root-node-ink": "#1b1408",
+      "shadow-sm": "0 1px 1px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(255, 248, 221, 0.06) inset",
+      "shadow-md": "0 10px 24px rgba(0, 0, 0, 0.3)",
+      "shadow-lg": "0 22px 54px rgba(0, 0, 0, 0.42)",
+      "node-shadow": "drop-shadow(0 7px 12px rgba(0, 0, 0, 0.32))"
+    } : {
+      bg: "#eee8d6",
+      surface: "rgba(255, 253, 244, 0.78)",
+      "surface-solid": "#fffaf0",
+      "surface-raised": "rgba(255, 253, 246, 0.94)",
+      "surface-recessed": "rgba(239, 232, 211, 0.78)",
+      "glass-border": "rgba(117, 104, 76, 0.2)",
+      hairline: "rgba(117, 104, 76, 0.15)",
+      field: "rgba(255, 253, 246, 0.94)",
+      "field-hover": "#fffdf6",
+      control: "linear-gradient(180deg, rgba(255, 252, 242, 0.97), rgba(237, 228, 207, 0.9))",
+      "control-hover": "linear-gradient(180deg, #fffdf6, rgba(232, 220, 194, 0.94))",
+      "control-pressed": "linear-gradient(180deg, rgba(224, 211, 181, 0.92), rgba(250, 244, 230, 0.98))",
+      "control-ink": "#2b261c",
+      focus: "#b77a1f",
+      "focus-soft": "rgba(183, 122, 31, 0.2)",
+      "path-glow": "rgba(183, 122, 31, 0.24)",
+      "path-fill": "rgba(183, 122, 31, 0.055)",
+      "sibling-glow": "rgba(68, 125, 83, 0.18)",
+      "sibling-fill": "rgba(68, 125, 83, 0.045)",
+      ink: "#2b261c",
+      muted: "#706753",
+      label: "#817354",
+      "canvas-bg": "#f7f1df",
+      "canvas-grid": "rgba(117, 104, 76, 0.07)",
+      "canvas-wash": "rgba(255, 252, 242, 0.66)",
+      "ring-guide": "rgba(117, 104, 76, 0.28)",
+      "node-fill": "rgba(255, 252, 242, 0.96)",
+      "node-ink": "#2b261c",
+      "root-node-fill": "#2f3328",
+      "root-node-ink": "#fffaf0",
+      "shadow-sm": "0 1px 1px rgba(82, 69, 40, 0.08), 0 1px 0 rgba(255, 255, 255, 0.58) inset",
+      "shadow-md": "0 8px 18px rgba(82, 69, 40, 0.12)",
+      "shadow-lg": "0 18px 42px rgba(82, 69, 40, 0.16)",
+      "node-shadow": "drop-shadow(0 5px 8px rgba(82, 69, 40, 0.13))"
+    };
+  }
+
+  function radarTokens() {
+    return {
+      bg: "#090f12",
+      surface: "rgba(12, 24, 27, 0.76)",
+      "surface-solid": "#0d1b1f",
+      "surface-raised": "rgba(17, 31, 36, 0.9)",
+      "surface-recessed": "rgba(8, 16, 19, 0.9)",
+      "glass-border": "rgba(88, 214, 141, 0.18)",
+      hairline: "rgba(88, 214, 141, 0.13)",
+      field: "rgba(10, 21, 24, 0.94)",
+      "field-hover": "rgba(15, 30, 34, 0.98)",
+      control: "linear-gradient(180deg, rgba(24, 52, 58, 0.9), rgba(12, 28, 32, 0.94))",
+      "control-hover": "linear-gradient(180deg, rgba(31, 68, 74, 0.96), rgba(15, 36, 40, 0.98))",
+      "control-pressed": "linear-gradient(180deg, rgba(7, 20, 23, 0.98), rgba(26, 56, 62, 0.94))",
+      "control-ink": "#d9ffe8",
+      focus: "#58d68d",
+      "focus-soft": "rgba(88, 214, 141, 0.24)",
+      "path-glow": "rgba(88, 214, 141, 0.34)",
+      "path-fill": "rgba(88, 214, 141, 0.07)",
+      "sibling-glow": "rgba(56, 189, 248, 0.2)",
+      "sibling-fill": "rgba(56, 189, 248, 0.055)",
+      ink: "#e6fff0",
+      muted: "#9dc9b0",
+      label: "#83b89b",
+      "canvas-bg": "#061013",
+      "canvas-grid": "rgba(88, 214, 141, 0.12)",
+      "canvas-wash": "rgba(14, 116, 144, 0.12)",
+      "ring-guide": "rgba(88, 214, 141, 0.42)",
+      "node-fill": "rgba(9, 28, 31, 0.92)",
+      "node-ink": "#d9ffe8",
+      "root-node-fill": "#58d68d",
+      "root-node-ink": "#06100a",
+      "node-shadow": "drop-shadow(0 0 12px rgba(88, 214, 141, 0.2))"
+    };
+  }
+
+  function kanbanTokens(dark) {
+    return dark ? {
+      bg: "#171312",
+      surface: "rgba(45, 35, 32, 0.76)",
+      "surface-solid": "#2b211f",
+      "surface-raised": "rgba(55, 42, 38, 0.9)",
+      "surface-recessed": "rgba(31, 24, 22, 0.9)",
+      "glass-border": "rgba(242, 120, 83, 0.16)",
+      hairline: "rgba(242, 120, 83, 0.12)",
+      field: "rgba(44, 34, 31, 0.92)",
+      "field-hover": "rgba(57, 43, 39, 0.96)",
+      control: "linear-gradient(180deg, rgba(63, 48, 43, 0.9), rgba(42, 32, 29, 0.94))",
+      "control-hover": "linear-gradient(180deg, rgba(76, 57, 51, 0.96), rgba(50, 38, 34, 0.98))",
+      "control-pressed": "linear-gradient(180deg, rgba(35, 26, 24, 0.98), rgba(65, 49, 44, 0.94))",
+      "control-ink": "#f7ede8",
+      focus: "#f27853",
+      "focus-soft": "rgba(242, 120, 83, 0.24)",
+      "path-glow": "rgba(242, 120, 83, 0.3)",
+      "path-fill": "rgba(242, 120, 83, 0.08)",
+      "sibling-glow": "rgba(125, 211, 252, 0.18)",
+      "sibling-fill": "rgba(125, 211, 252, 0.055)",
+      ink: "#f7ede8",
+      muted: "#c8aaa1",
+      label: "#b89084",
+      "canvas-bg": "#181515",
+      "canvas-grid": "rgba(255, 255, 255, 0.055)",
+      "canvas-wash": "rgba(66, 40, 35, 0.28)",
+      "ring-guide": "rgba(242, 120, 83, 0.24)",
+      "node-fill": "rgba(40, 34, 32, 0.94)",
+      "node-ink": "#f9eee9",
+      "root-node-fill": "#f27853",
+      "root-node-ink": "#1b100d",
+      "node-shadow": "drop-shadow(0 9px 14px rgba(0, 0, 0, 0.28))"
+    } : {
+      bg: "#f2f5f0",
+      surface: "rgba(255, 255, 255, 0.78)",
+      "surface-solid": "#ffffff",
+      "surface-raised": "rgba(255, 255, 255, 0.94)",
+      "surface-recessed": "rgba(232, 238, 232, 0.82)",
+      "glass-border": "rgba(75, 85, 99, 0.18)",
+      hairline: "rgba(75, 85, 99, 0.13)",
+      field: "rgba(255, 255, 255, 0.94)",
+      "field-hover": "#ffffff",
+      control: "linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(229, 235, 229, 0.9))",
+      "control-hover": "linear-gradient(180deg, #ffffff, rgba(220, 229, 222, 0.94))",
+      "control-pressed": "linear-gradient(180deg, rgba(211, 222, 214, 0.92), rgba(246, 249, 246, 0.98))",
+      "control-ink": "#1f2933",
+      focus: "#0f6f9e",
+      "focus-soft": "rgba(15, 111, 158, 0.18)",
+      "path-glow": "rgba(15, 111, 158, 0.24)",
+      "path-fill": "rgba(15, 111, 158, 0.05)",
+      "sibling-glow": "rgba(197, 95, 44, 0.16)",
+      "sibling-fill": "rgba(197, 95, 44, 0.045)",
+      ink: "#1f2933",
+      muted: "#66727f",
+      label: "#758392",
+      "canvas-bg": "#f5f7f4",
+      "canvas-grid": "rgba(75, 85, 99, 0.055)",
+      "canvas-wash": "rgba(255, 255, 255, 0.66)",
+      "ring-guide": "rgba(15, 111, 158, 0.24)",
+      "node-fill": "rgba(255, 255, 255, 0.94)",
+      "node-ink": "#1f2933",
+      "root-node-fill": "#243447",
+      "root-node-ink": "#ffffff",
+      "node-shadow": "drop-shadow(0 8px 12px rgba(36, 52, 71, 0.14))"
+    };
+  }
+
+  function schematicTokens(dark) {
+    return dark ? {
+      bg: "#111315",
+      surface: "rgba(29, 32, 35, 0.76)",
+      "surface-solid": "#202428",
+      "surface-raised": "rgba(39, 43, 48, 0.9)",
+      "surface-recessed": "rgba(20, 23, 26, 0.9)",
+      "glass-border": "rgba(190, 202, 214, 0.16)",
+      hairline: "rgba(190, 202, 214, 0.12)",
+      field: "rgba(25, 28, 31, 0.94)",
+      "field-hover": "rgba(35, 39, 43, 0.98)",
+      control: "linear-gradient(180deg, rgba(55, 60, 66, 0.88), rgba(35, 39, 44, 0.92))",
+      "control-hover": "linear-gradient(180deg, rgba(66, 72, 79, 0.94), rgba(42, 47, 52, 0.96))",
+      "control-pressed": "linear-gradient(180deg, rgba(28, 31, 35, 0.98), rgba(57, 62, 68, 0.92))",
+      "control-ink": "#f0f3f5",
+      focus: "#f2c94c",
+      "focus-soft": "rgba(242, 201, 76, 0.22)",
+      "path-glow": "rgba(242, 201, 76, 0.25)",
+      "path-fill": "rgba(242, 201, 76, 0.055)",
+      "sibling-glow": "rgba(148, 163, 184, 0.2)",
+      "sibling-fill": "rgba(148, 163, 184, 0.055)",
+      ink: "#f0f3f5",
+      muted: "#b6c1cb",
+      label: "#a4b0ba",
+      "canvas-bg": "#15181b",
+      "canvas-grid": "rgba(203, 213, 225, 0.09)",
+      "canvas-wash": "rgba(55, 65, 81, 0.18)",
+      "ring-guide": "rgba(203, 213, 225, 0.3)",
+      "node-fill": "rgba(24, 28, 32, 0.94)",
+      "node-ink": "#f0f3f5",
+      "root-node-fill": "#f0f3f5",
+      "root-node-ink": "#111315",
+      "node-shadow": "drop-shadow(0 5px 8px rgba(0, 0, 0, 0.22))"
+    } : {
+      bg: "#f0f2f3",
+      surface: "rgba(255, 255, 255, 0.78)",
+      "surface-solid": "#ffffff",
+      "surface-raised": "rgba(255, 255, 255, 0.94)",
+      "surface-recessed": "rgba(231, 235, 238, 0.82)",
+      "glass-border": "rgba(78, 91, 105, 0.2)",
+      hairline: "rgba(78, 91, 105, 0.15)",
+      field: "rgba(255, 255, 255, 0.94)",
+      "field-hover": "#ffffff",
+      control: "linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(232, 237, 241, 0.9))",
+      "control-hover": "linear-gradient(180deg, #ffffff, rgba(224, 231, 236, 0.94))",
+      "control-pressed": "linear-gradient(180deg, rgba(217, 225, 231, 0.92), rgba(246, 248, 250, 0.98))",
+      "control-ink": "#1f2933",
+      focus: "#0f6f9e",
+      "focus-soft": "rgba(15, 111, 158, 0.18)",
+      "path-glow": "rgba(15, 111, 158, 0.24)",
+      "path-fill": "rgba(15, 111, 158, 0.05)",
+      "sibling-glow": "rgba(107, 114, 128, 0.16)",
+      "sibling-fill": "rgba(107, 114, 128, 0.045)",
+      ink: "#1f2933",
+      muted: "#66727f",
+      label: "#758392",
+      "canvas-bg": "#f8fafc",
+      "canvas-grid": "rgba(78, 91, 105, 0.085)",
+      "canvas-wash": "rgba(255, 255, 255, 0.62)",
+      "ring-guide": "rgba(78, 91, 105, 0.3)",
+      "node-fill": "rgba(255, 255, 255, 0.95)",
+      "node-ink": "#1f2933",
+      "root-node-fill": "#1f2933",
+      "root-node-ink": "#ffffff",
+      "node-shadow": "drop-shadow(0 5px 8px rgba(31, 41, 51, 0.12))"
+    };
   }
 
   function blueprintTokens() {

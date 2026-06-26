@@ -69,7 +69,11 @@
       papery: { label: "Papery" },
       blueprint: { label: "Blueprint" },
       terminal: { label: "Terminal" },
-      soft: { label: "Soft" }
+      soft: { label: "Soft" },
+      "index-card": { label: "Index Card" },
+      radar: { label: "Radar" },
+      kanban: { label: "Kanban" },
+      schematic: { label: "Schematic" }
     },
     navigationModes: {
       directional: { label: "Spatial arrows" },
@@ -167,6 +171,96 @@
           "ring-guide": "rgba(255, 255, 255, 0.5)"
         }
       },
+      oxide: {
+        label: "Oxide",
+        colorScheme: "dark",
+        tokens: {
+          bg: "#171312",
+          "surface-solid": "#2b211f",
+          ink: "#f7ede8",
+          muted: "#c8aaa1",
+          label: "#b89084",
+          field: "rgba(44, 34, 31, 0.9)",
+          "canvas-bg": "#1d1715",
+          "canvas-grid": "rgba(242, 120, 83, 0.07)",
+          "node-fill": "rgba(54, 41, 37, 0.92)",
+          "root-node-fill": "#f27853",
+          "root-node-ink": "#1b100d",
+          "ring-guide": "rgba(242, 120, 83, 0.32)"
+        }
+      },
+      sage: {
+        label: "Sage",
+        colorScheme: "light",
+        tokens: {
+          bg: "#eef2ec",
+          "surface-solid": "#fbfdf8",
+          ink: "#1d2a22",
+          muted: "#65746b",
+          label: "#6d7d72",
+          field: "rgba(251, 253, 248, 0.9)",
+          "canvas-bg": "#f4f7f1",
+          "canvas-grid": "rgba(73, 109, 87, 0.065)",
+          "node-fill": "rgba(251, 253, 248, 0.93)",
+          "root-node-fill": "#365c42",
+          "root-node-ink": "#f7fff2",
+          "ring-guide": "rgba(73, 109, 87, 0.3)"
+        }
+      },
+      solar: {
+        label: "Solar",
+        colorScheme: "light",
+        tokens: {
+          bg: "#f6f0df",
+          "surface-solid": "#fffaf0",
+          ink: "#2c261b",
+          muted: "#746955",
+          label: "#85745b",
+          field: "rgba(255, 250, 240, 0.9)",
+          "canvas-bg": "#fbf4df",
+          "canvas-grid": "rgba(176, 112, 32, 0.065)",
+          "node-fill": "rgba(255, 250, 240, 0.93)",
+          "root-node-fill": "#c55f2c",
+          "root-node-ink": "#fff8ea",
+          "ring-guide": "rgba(176, 112, 32, 0.3)"
+        }
+      },
+      "mono-high": {
+        label: "Mono High",
+        colorScheme: "dark",
+        tokens: {
+          bg: "#050505",
+          "surface-solid": "#141414",
+          ink: "#f8f8f8",
+          muted: "#cfcfcf",
+          label: "#e0e0e0",
+          field: "#0a0a0a",
+          "canvas-bg": "#000000",
+          "canvas-grid": "rgba(255, 255, 255, 0.11)",
+          "node-fill": "#0d0d0d",
+          "root-node-fill": "#ffffff",
+          "root-node-ink": "#000000",
+          "ring-guide": "rgba(255, 255, 255, 0.58)"
+        }
+      },
+      ember: {
+        label: "Ember",
+        colorScheme: "dark",
+        tokens: {
+          bg: "#120f12",
+          "surface-solid": "#241b22",
+          ink: "#fff1e8",
+          muted: "#d0aaa0",
+          label: "#c58f83",
+          field: "rgba(39, 29, 35, 0.9)",
+          "canvas-bg": "#171116",
+          "canvas-grid": "rgba(255, 149, 87, 0.07)",
+          "node-fill": "rgba(43, 31, 38, 0.92)",
+          "root-node-fill": "#ff8a4c",
+          "root-node-ink": "#1a0d07",
+          "ring-guide": "rgba(255, 149, 87, 0.32)"
+        }
+      },
       custom: {
         label: "Custom",
         colorScheme: "light",
@@ -184,6 +278,44 @@
           "root-node-ink": "#ffffff",
           "ring-guide": "#9aa3b2"
         }
+      }
+    },
+    modePacks: {
+      research: {
+        label: "Research Desk",
+        theme: "sage",
+        stylePreset: "index-card",
+        navigationMode: "outline",
+        viewMode: "ring",
+        nodeFontSize: 13,
+        spacing: { treeLevelGap: 86, treeLeafGap: 122, ringBaseRadius: 118, ringDepthGap: 108, ringNodeGap: 30 }
+      },
+      ops: {
+        label: "Ops Board",
+        theme: "oxide",
+        stylePreset: "kanban",
+        navigationMode: "hybrid",
+        viewMode: "tree",
+        nodeFontSize: 12.5,
+        spacing: { treeLevelGap: 72, treeLeafGap: 96, ringBaseRadius: 102, ringDepthGap: 88, ringNodeGap: 18 }
+      },
+      war: {
+        label: "War Room",
+        theme: "ember",
+        stylePreset: "radar",
+        navigationMode: "directional",
+        viewMode: "ring",
+        nodeFontSize: 12,
+        spacing: { treeLevelGap: 78, treeLeafGap: 104, ringBaseRadius: 140, ringDepthGap: 132, ringNodeGap: 44 }
+      },
+      print: {
+        label: "Print Packet",
+        theme: "solar",
+        stylePreset: "schematic",
+        navigationMode: "outline",
+        viewMode: "tree",
+        nodeFontSize: 12,
+        spacing: { treeLevelGap: 92, treeLeafGap: 132, ringBaseRadius: 120, ringDepthGap: 112, ringNodeGap: 36 }
       }
     },
     themeTokenControls: [
