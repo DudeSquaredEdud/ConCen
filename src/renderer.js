@@ -332,10 +332,10 @@
   function textProfile(viewMode, depth) {
     const profiles = {
       book: {
-        0: { padX: 20, padY: 18, labelChars: 28, labelLines: 2, noteChars: 46, noteLines: Infinity, labelLineHeight: 18, noteLineHeight: 15, noteGap: 12 },
-        1: { padX: 18, padY: 15, labelChars: 24, labelLines: 2, noteChars: 42, noteLines: Infinity, labelLineHeight: 17, noteLineHeight: 14, noteGap: 10 },
-        2: { padX: 17, padY: 14, labelChars: 30, labelLines: 2, noteChars: 48, noteLines: Infinity, labelLineHeight: 16, noteLineHeight: 14, noteGap: 9 },
-        3: { padX: 15, padY: 13, labelChars: 26, labelLines: 2, noteChars: 40, noteLines: Infinity, labelLineHeight: 15, noteLineHeight: 13, noteGap: 8 }
+        0: { padX: 24, padY: 24, labelChars: 25, labelLines: 2, noteChars: 54, noteLines: Infinity, labelLineHeight: 29, noteLineHeight: 16, noteGap: 14 },
+        1: { padX: 19, padY: 17, labelChars: 25, labelLines: 2, noteChars: 44, noteLines: Infinity, labelLineHeight: 22, noteLineHeight: 15, noteGap: 11 },
+        2: { padX: 17, padY: 16, labelChars: 30, labelLines: 2, noteChars: 48, noteLines: Infinity, labelLineHeight: 20, noteLineHeight: 14, noteGap: 10 },
+        3: { padX: 15, padY: 14, labelChars: 26, labelLines: 2, noteChars: 40, noteLines: Infinity, labelLineHeight: 18, noteLineHeight: 13, noteGap: 8 }
       }
     };
     return profiles[viewMode] && profiles[viewMode][depth];

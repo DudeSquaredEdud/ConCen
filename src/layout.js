@@ -58,10 +58,10 @@
     function contentProfile(viewMode, depth) {
       const profiles = {
         book: {
-          0: { width: 380, minHeight: 92, labelChars: 28, labelLines: 2, noteChars: 46, noteLines: Infinity, paddingY: 18, labelLineHeight: 18, noteGap: 12, noteLineHeight: 15 },
-          1: { width: 340, minHeight: 76, labelChars: 24, labelLines: 2, noteChars: 42, noteLines: Infinity, paddingY: 15, labelLineHeight: 17, noteGap: 10, noteLineHeight: 14 },
-          2: { width: 390, minHeight: 72, labelChars: 30, labelLines: 2, noteChars: 48, noteLines: Infinity, paddingY: 14, labelLineHeight: 16, noteGap: 9, noteLineHeight: 14 },
-          3: { width: 330, minHeight: 66, labelChars: 26, labelLines: 2, noteChars: 40, noteLines: Infinity, paddingY: 13, labelLineHeight: 15, noteGap: 8, noteLineHeight: 13 }
+          0: { width: 460, minHeight: 124, labelChars: 25, labelLines: 2, noteChars: 54, noteLines: Infinity, paddingY: 24, labelLineHeight: 29, noteGap: 14, noteLineHeight: 16 },
+          1: { width: 360, minHeight: 86, labelChars: 25, labelLines: 2, noteChars: 44, noteLines: Infinity, paddingY: 17, labelLineHeight: 22, noteGap: 11, noteLineHeight: 15 },
+          2: { width: 390, minHeight: 82, labelChars: 30, labelLines: 2, noteChars: 48, noteLines: Infinity, paddingY: 16, labelLineHeight: 20, noteGap: 10, noteLineHeight: 14 },
+          3: { width: 330, minHeight: 72, labelChars: 26, labelLines: 2, noteChars: 40, noteLines: Infinity, paddingY: 14, labelLineHeight: 18, noteGap: 8, noteLineHeight: 13 }
         }
       };
       return (profiles[viewMode] && profiles[viewMode][depth]) || profiles[viewMode][3];
@@ -258,11 +258,11 @@
         previous = primary;
         primary.children.forEach((secondary) => {
           y = stackNextY(y, previous, secondary, rowGap, "book");
-          positions.set(secondary.id, { x: x - columnWidth * 0.1, y });
+          positions.set(secondary.id, { x, y });
           previous = secondary;
           secondary.children.forEach((leaf) => {
             y = stackNextY(y, previous, leaf, rowGap * 0.72, "book");
-            positions.set(leaf.id, { x: x + Math.min(52, columnWidth * 0.16), y });
+            positions.set(leaf.id, { x, y });
             previous = leaf;
           });
         });

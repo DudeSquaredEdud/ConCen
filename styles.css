@@ -2415,7 +2415,22 @@ button:disabled:hover {
 }
 
 .node.view-book .node-label {
+  font-size: calc(var(--node-font-size) + 2px);
   font-weight: 850;
+}
+
+.node.view-book.role-cover .node-label {
+  font-size: calc(var(--node-font-size) + 10px);
+  font-weight: 950;
+}
+
+.node.view-book.role-chapter .node-label {
+  font-size: calc(var(--node-font-size) + 5px);
+}
+
+.node.view-book.role-section .node-label,
+.node.view-book.role-note .node-label {
+  font-size: calc(var(--node-font-size) + 3px);
 }
 
 .node .node-note-preview {
