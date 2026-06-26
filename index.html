@@ -300,22 +300,48 @@
       <div id="welcomeDialog" class="welcome-dialog" role="dialog" aria-modal="true" aria-label="Welcome to ConCen" hidden>
         <div class="welcome-panel">
           <div class="welcome-head">
-            <div>
-              <span class="note-eyebrow">Welcome</span>
+            <div class="welcome-brand">
+              <svg class="concen-logo welcome-logo" viewBox="0 0 1024 1024" aria-hidden="true" focusable="false">
+                <rect class="concen-logo-bg" x="64" y="64" width="896" height="896" rx="210"/>
+                <g class="concen-logo-lines" fill="none" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="512" cy="512" r="332"/>
+                  <circle cx="512" cy="512" r="232"/>
+                  <circle cx="512" cy="512" r="134"/>
+                  <path d="M512 180 L512 844"/>
+                  <path d="M278 746 L746 278"/>
+                  <path d="M360 360 L670 670"/>
+                  <path d="M376 648 L512 512 L648 376"/>
+                  <path d="M512 512 L648 648"/>
+                </g>
+                <circle class="concen-logo-mark" cx="512" cy="512" r="76"/>
+                <g class="concen-logo-nodes">
+                  <circle cx="512" cy="180" r="40"/>
+                  <circle cx="747" cy="277" r="30"/>
+                  <circle cx="844" cy="512" r="30"/>
+                  <circle cx="512" cy="844" r="40"/>
+                  <circle cx="278" cy="746" r="30"/>
+                  <circle cx="180" cy="512" r="30"/>
+                  <circle cx="512" cy="280" r="30"/>
+                  <circle cx="676" cy="348" r="30"/>
+                  <circle cx="676" cy="676" r="40"/>
+                  <circle cx="512" cy="744" r="30"/>
+                  <circle cx="348" cy="676" r="30"/>
+                  <circle cx="348" cy="348" r="40"/>
+                </g>
+              </svg>
               <h1>ConCen</h1>
+              <p>Concentric Concepts, for Concentration</p>
             </div>
             <output id="welcomeStats" class="welcome-stats"></output>
           </div>
-          <p>Concentric Concepts, for Concentration</p>
           <div class="welcome-section">
-            <span class="welcome-label">Guided start</span>
             <div class="welcome-tutorial">
-              <button id="welcomeTutorialButton" type="button" data-icon="▶">Start Tutorial Mind Map</button>
-              <span>Learn by opening notes, following links, searching commands, and moving nodes.</span>
+              <button id="welcomeTutorialButton" type="button" data-icon="▶">Tutorial Mind</button>
+              <span>Guided map for notes, links, commands, and movement.</span>
             </div>
           </div>
           <div class="welcome-section">
-            <span class="welcome-label">Start from template</span>
+            <span class="welcome-label">Templates</span>
             <div class="welcome-templates" id="welcomeTemplates">
               <button type="button" data-template="blank">Blank</button>
               <button type="button" data-template="project">Project Plan</button>
@@ -323,36 +349,6 @@
               <button type="button" data-template="research">Research Notes</button>
               <button type="button" data-template="issues">Issue Tracker</button>
             </div>
-          </div>
-          <div class="welcome-section">
-            <span class="welcome-label">Choose style</span>
-            <div class="welcome-style-row" id="welcomeStyles">
-              <button type="button" data-style="glass">Glass</button>
-              <button type="button" data-style="papery">Papery</button>
-              <button type="button" data-style="blueprint">Blueprint</button>
-              <button type="button" data-style="terminal">Terminal</button>
-              <button type="button" data-style="index-card">Index Card</button>
-              <button type="button" data-style="radar">Radar</button>
-              <button type="button" data-style="kanban">Kanban</button>
-              <button type="button" data-style="schematic">Schematic</button>
-            </div>
-          </div>
-          <div class="welcome-section">
-            <span class="welcome-label">Mode packs</span>
-            <div class="welcome-style-row" id="welcomeModePacks">
-              <button type="button" data-mode-pack="research">Research Desk</button>
-              <button type="button" data-mode-pack="ops">Ops Board</button>
-              <button type="button" data-mode-pack="war">War Room</button>
-              <button type="button" data-mode-pack="print">Print Packet</button>
-            </div>
-          </div>
-          <div class="welcome-grid">
-            <span>Enter adds a child</span>
-            <span>Ctrl+K searches and commands</span>
-            <span>[[node:id|title]] links notes</span>
-            <span>Backlinks appear automatically</span>
-            <span>Alt+Enter opens a node map</span>
-            <span>Type move in commands to reparent</span>
           </div>
           <div class="welcome-section">
             <span class="welcome-label">Recent minds</span>

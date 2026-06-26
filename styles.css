@@ -1655,35 +1655,48 @@ button:disabled:hover {
 
 .welcome-panel {
   display: grid;
-  gap: 16px;
-  max-height: min(86vh, 720px);
-  padding: 22px;
+  gap: 18px;
+  max-height: min(86vh, 640px);
+  padding: 26px;
   overflow: auto;
 }
 
 .welcome-head {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 16px;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.welcome-brand {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.welcome-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
 }
 
 .welcome-panel h1 {
-  margin: 2px 0 0;
-  font-size: 34px;
+  margin: 0;
+  font-size: 40px;
   line-height: 1;
   letter-spacing: 0;
 }
 
 .welcome-panel p {
   margin: 0;
-  max-width: 54ch;
+  max-width: 38ch;
   color: var(--muted);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .welcome-stats {
+  justify-self: center;
   min-height: 28px;
   padding: 6px 10px;
   border: 1px solid var(--hairline);
@@ -1718,13 +1731,12 @@ button:disabled:hover {
 
 .welcome-tutorial {
   display: grid;
-  grid-template-columns: minmax(190px, auto) 1fr;
+  grid-template-columns: minmax(150px, auto) 1fr;
   align-items: center;
   gap: 10px;
-  padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--focus) 28%, var(--hairline));
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--focus) 8%, var(--field));
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .welcome-templates button,
@@ -1752,23 +1764,6 @@ button:disabled:hover {
 .welcome-recent span {
   color: var(--muted);
   font-size: 12px;
-}
-
-.welcome-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.welcome-grid span {
-  min-height: 34px;
-  padding: 9px 10px;
-  border: 1px solid var(--hairline);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--field) 70%, transparent);
-  color: var(--control-ink);
-  font-size: 12px;
-  font-weight: 750;
 }
 
 .welcome-actions {
@@ -2844,16 +2839,12 @@ button:disabled:hover {
     text-align: center;
   }
 
-  .welcome-grid {
-    grid-template-columns: 1fr;
-  }
-
   .welcome-head {
     display: grid;
   }
 
   .welcome-stats {
-    justify-self: start;
+    justify-self: center;
     white-space: normal;
   }
 

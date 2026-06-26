@@ -135,6 +135,10 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
 
         page.goto(url, wait_until="networkidle")
         page.wait_for_selector("#chartCanvas .node", timeout=5000)
+        if page.locator("#welcomeDialog .welcome-logo").count() != 1:
+            raise AssertionError("Welcome dialog did not render logo")
+        if "ConCen" not in (page.locator("#welcomeDialog").text_content() or ""):
+            raise AssertionError("Welcome dialog did not render title")
         page.locator("#welcomeCloseButton").click()
 
         initial_nodes = page.locator("#chartCanvas .node").count()
@@ -359,6 +363,11 @@ def smoke_mobile(browser_type, browser_name: str, url: str) -> None:
         page.on("pageerror", lambda exc: messages.append(f"pageerror:{exc}"))
         page.goto(url, wait_until="networkidle")
         page.wait_for_selector("#chartCanvas .node", timeout=5000)
+        if page.locator("#welcomeDialog .welcome-logo").count() != 1:
+            raise AssertionError("Mobile welcome dialog did not render logo")
+        welcome_width = page.locator(".welcome-panel").evaluate("el => el.getBoundingClientRect().width")
+        if welcome_width > 390:
+            raise AssertionError(f"Mobile welcome panel too wide: {welcome_width}px")
         page.locator("#welcomeCloseButton").click()
         if page.locator("#chartCanvas .node").count() < 1:
             raise AssertionError("Mobile viewport rendered no nodes")
