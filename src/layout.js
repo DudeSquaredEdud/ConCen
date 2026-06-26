@@ -26,20 +26,94 @@
       return Number.isFinite(value) ? value : 13;
     }
 
-    function nodeSize(node) {
+    function nodeSize(node, viewMode) {
       const base = config.layout;
       const fontSize = nodeFontSize();
       const scale = fontSize / 13;
       const minWidth = node.depth === 0 ? base.rootWidth : base.nodeWidth;
       const minHeight = node.depth === 0 ? base.rootHeight : base.nodeHeight;
+      const contentSize = contentNodeSize(node, viewMode, scale);
+      if (contentSize) return contentSize;
       return {
         width: Math.max(minWidth * scale, Math.ceil(measureLabel(node.label) + base.nodePadX * scale * 2)),
         height: Math.max(minHeight, Math.ceil(minHeight * scale))
       };
     }
 
-    function maxNodeWidth(tree) {
-      return model.visibleNodes(tree).reduce((max, { node }) => Math.max(max, nodeSize(node).width), config.layout.rootWidth);
+    function contentNodeSize(node, viewMode, scale) {
+      const mode = String(viewMode || "");
+      if (mode !== "book") return null;
+      const note = normalizedNote(node.note);
+      const profile = contentProfile(mode, node.depth);
+      const labelLines = wrappedLineCount(node.label, profile.labelChars, profile.labelLines);
+      const noteLines = note ? wrappedLineCount(note, profile.noteChars, profile.noteLines) : 0;
+      const width = Math.max(profile.width * scale, Math.ceil(measureLabel(node.label) + config.layout.nodePadX * scale * 2));
+      const height = Math.max(
+        profile.minHeight * scale,
+        profile.paddingY * 2 * scale + labelLines * profile.labelLineHeight * scale + (noteLines ? profile.noteGap * scale + noteLines * profile.noteLineHeight * scale : 0)
+      );
+      return { width: Math.ceil(width), height: Math.ceil(height) };
+    }
+
+    function contentProfile(viewMode, depth) {
+      const profiles = {
+        book: {
+          0: { width: 380, minHeight: 92, labelChars: 28, labelLines: 2, noteChars: 46, noteLines: Infinity, paddingY: 18, labelLineHeight: 18, noteGap: 12, noteLineHeight: 15 },
+          1: { width: 340, minHeight: 76, labelChars: 24, labelLines: 2, noteChars: 42, noteLines: Infinity, paddingY: 15, labelLineHeight: 17, noteGap: 10, noteLineHeight: 14 },
+          2: { width: 390, minHeight: 72, labelChars: 30, labelLines: 2, noteChars: 48, noteLines: Infinity, paddingY: 14, labelLineHeight: 16, noteGap: 9, noteLineHeight: 14 },
+          3: { width: 330, minHeight: 66, labelChars: 26, labelLines: 2, noteChars: 40, noteLines: Infinity, paddingY: 13, labelLineHeight: 15, noteGap: 8, noteLineHeight: 13 }
+        }
+      };
+      return (profiles[viewMode] && profiles[viewMode][depth]) || profiles[viewMode][3];
+    }
+
+    function wrappedLineCount(text, charsPerLine, maxLines) {
+      if (!charsPerLine || !maxLines) return 0;
+      const lines = wrapTextLines(text, charsPerLine, maxLines);
+      return lines.length;
+    }
+
+    function wrapTextLines(text, charsPerLine, maxLines) {
+      const clean = normalizedNote(text);
+      if (!clean) return [];
+      const limit = Number.isFinite(maxLines) ? maxLines : Infinity;
+      const result = [];
+      clean.split(/\n+/).forEach((paragraph) => {
+        const words = paragraph.trim().split(/\s+/).filter(Boolean);
+        let line = "";
+        words.forEach((word) => {
+          const next = line ? line + " " + word : word;
+          if (next.length <= charsPerLine) {
+            line = next;
+            return;
+          }
+          if (line) result.push(line);
+          line = word.length > charsPerLine ? word.slice(0, charsPerLine) : word;
+        });
+        if (line) result.push(line);
+      });
+      return result.slice(0, limit);
+    }
+
+    function normalizedNote(value) {
+      return String(value || "")
+        .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, "$2")
+        .replace(/\[\[([^\]]+)\]\]/g, "$1")
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+        .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+        .replace(/^#{1,6}\s+/gm, "")
+        .replace(/^[-*+]\s+\[[ xX]\]\s+/gm, "☐ ")
+        .replace(/^[-*+]\s+/gm, "• ")
+        .replace(/^\d+[.)]\s+/gm, "• ")
+        .replace(/^>\s+/gm, "")
+        .replace(/^(-{3,}|\*{3,}|_{3,})$/gm, "────────────────")
+        .replace(/^\|(.+)\|$/gm, (match) => match.replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim()).filter(Boolean).join(" • "))
+        .replace(/[*_`~=]/g, "")
+        .trim();
+    }
+
+    function maxNodeWidth(tree, viewMode) {
+      return model.visibleNodes(tree).reduce((max, { node }) => Math.max(max, nodeSize(node, viewMode).width), config.layout.rootWidth);
     }
 
     function leafCounts(tree) {
@@ -78,8 +152,9 @@
     }
 
     function worldSize(tree, viewport, viewMode, spacing) {
-      const nodeWidth = maxNodeWidth(tree);
-      const radius = viewMode === "ring" ? outerRingRadius(tree, spacing) : flatRingRadius(tree, spacing);
+      const nodeWidth = maxNodeWidth(tree, viewMode);
+      if (viewMode === "book") return structuredWorldSize(tree, viewport, viewMode, spacing);
+      const radius = viewMode === "radial" ? radialDiskRadius(tree, spacing) : flatRingRadius(tree, spacing);
       const ringDiameter = radius * 2 + nodeWidth + 48;
       return {
         width: Math.max(viewport.width + 240, ringDiameter),
@@ -87,19 +162,29 @@
       };
     }
 
-    function layout(tree, viewport, viewMode, spacing) {
+    function layout(tree, viewport, viewMode, spacing, focusedId) {
       const world = worldSize(tree, viewport, viewMode, spacing);
       const nodes = model.visibleNodes(tree);
       if (viewMode === "ring") {
         const ring = ringLayout(tree, nodes, world, spacing);
         staggerCrowdedRingNodes(nodes, ring.positions, ring.center);
-        resolveNodeOverlaps(nodes, ring.positions);
-        return { world, positions: ring.positions, nodes, rings: ring.rings, bounds: layoutBounds(nodes, ring.positions) };
+        resolveNodeOverlaps(nodes, ring.positions, viewMode);
+        return { world, positions: ring.positions, nodes, rings: ring.rings, bounds: layoutBounds(nodes, ring.positions, viewMode) };
+      }
+      if (viewMode === "radial") {
+        const radial = radialDiskLayout(tree, nodes, world, spacing);
+        resolveNodeOverlaps(nodes, radial.positions, viewMode);
+        return { world, positions: radial.positions, nodes, rings: radial.rings, bounds: layoutBounds(nodes, radial.positions, viewMode) };
+      }
+      if (viewMode === "book") {
+        const book = bookLayout(tree, nodes, world, spacing);
+        resolveNodeOverlaps(nodes, book.positions, viewMode);
+        return { world, positions: book.positions, nodes, rings: [], bounds: layoutBounds(nodes, book.positions, viewMode) };
       }
       const flat = flatRingLayout(tree, nodes, world, spacing);
       staggerCrowdedRingNodes(nodes, flat.positions, flat.center);
-      resolveNodeOverlaps(nodes, flat.positions);
-      return { world, positions: flat.positions, nodes, rings: flat.rings, bounds: layoutBounds(nodes, flat.positions) };
+      resolveNodeOverlaps(nodes, flat.positions, viewMode);
+      return { world, positions: flat.positions, nodes, rings: flat.rings, bounds: layoutBounds(nodes, flat.positions, viewMode) };
     }
 
     function treeLayout(tree, world, counts, spacing) {
@@ -157,11 +242,130 @@
       };
     }
 
+    function bookLayout(tree, nodes, world, spacing) {
+      const positions = new Map();
+      const columnWidth = structuredColumnWidth(tree, spacing, "book");
+      const rowGap = structuredRowGap(spacing, "book");
+      const primaries = tree.children;
+      const startX = world.width / 2 - ((Math.max(primaries.length, 1) - 1) * columnWidth) / 2;
+      const rootY = Math.max(config.layout.rootHeight / 2 + 52, 92);
+      positions.set(model.ROOT_ID, { x: world.width / 2, y: rootY });
+      primaries.forEach((primary, primaryIndex) => {
+        const x = startX + primaryIndex * columnWidth;
+        let previous = tree;
+        let y = stackNextY(rootY, previous, primary, rowGap, "book");
+        positions.set(primary.id, { x, y });
+        previous = primary;
+        primary.children.forEach((secondary) => {
+          y = stackNextY(y, previous, secondary, rowGap, "book");
+          positions.set(secondary.id, { x: x - columnWidth * 0.1, y });
+          previous = secondary;
+          secondary.children.forEach((leaf) => {
+            y = stackNextY(y, previous, leaf, rowGap * 0.72, "book");
+            positions.set(leaf.id, { x: x + Math.min(52, columnWidth * 0.16), y });
+            previous = leaf;
+          });
+        });
+      });
+      fillMissingStructured(nodes, positions, world);
+      return { positions };
+    }
+
+    function radialDiskLayout(tree, nodes, world, spacing) {
+      const positions = new Map();
+      const center = { x: world.width / 2, y: world.height / 2 };
+      const radius = radialDiskRadius(tree, spacing);
+      const anglePlan = buildAnglePlan(tree);
+      const visible = nodes.map(({ node }) => node).filter((node) => node.id !== model.ROOT_ID);
+      const maxDepth = Math.max(1, ...visible.map((node) => node.depth));
+      positions.set(model.ROOT_ID, center);
+
+      visible.forEach((node, index) => {
+        const plan = anglePlan.get(node.id) || { angle: stableAngle(node.id), span: Math.PI * 2, depth: node.depth };
+        const depthShare = node.depth / (maxDepth + 0.82);
+        const fillShare = Math.sqrt((index + 1) / Math.max(visible.length, 1));
+        const radialJitter = (stableUnit(node.id + ":r") - 0.5) * spacing.ringNodeGap * 1.8;
+        const angleJitter = (stableUnit(node.id + ":a") - 0.5) * Math.min(plan.span * 0.36, 0.72);
+        const nodeRadius = Math.max(
+          spacing.ringBaseRadius * 0.44,
+          radius * (0.18 + depthShare * 0.58 + fillShare * 0.18) + radialJitter
+        );
+        positions.set(node.id, polarPoint(center, plan.angle + angleJitter, Math.min(radius, nodeRadius)));
+      });
+
+      return {
+        positions,
+        center,
+        rings: [0.32, 0.58, 0.84].map((share, index) => ({ depth: index + 1, radius: radius * share, center }))
+      };
+    }
+
     function flatRingRadius(tree, spacing) {
       const nodes = model.visibleNodes(tree).filter(({ node }) => node.id !== model.ROOT_ID);
       if (!nodes.length) return Math.max(spacing.treeLevelGap, spacing.ringBaseRadius);
       const nodeArc = Math.max(spacing.treeLeafGap, maxNodeWidth(tree) + spacing.ringNodeGap);
       return Math.max(spacing.ringBaseRadius, spacing.treeLevelGap) + (nodes.length * nodeArc) / (Math.PI * 2);
+    }
+
+    function radialDiskRadius(tree, spacing) {
+      const nodes = model.visibleNodes(tree).filter(({ node }) => node.id !== model.ROOT_ID);
+      if (!nodes.length) return Math.max(spacing.ringBaseRadius, spacing.treeLevelGap);
+      const nodeFootprint = Math.max(maxNodeWidth(tree) + spacing.ringNodeGap, spacing.treeLeafGap);
+      const countRadius = Math.sqrt(nodes.length) * nodeFootprint * 0.72;
+      const depthRadius = maxDepthForTree(tree) * Math.max(spacing.ringDepthGap * 0.72, config.layout.nodeHeight + spacing.ringNodeGap);
+      return Math.max(spacing.ringBaseRadius * 1.1, countRadius, depthRadius);
+    }
+
+    function structuredWorldSize(tree, viewport, viewMode, spacing) {
+      const columnWidth = structuredColumnWidth(tree, spacing, viewMode);
+      const columnCount = Math.max(tree.children.length, 1);
+      return {
+        width: Math.max(viewport.width + 240, columnCount * columnWidth + 220),
+        height: Math.max(viewport.height + 180, structuredContentHeight(tree, viewMode, spacing) + 240)
+      };
+    }
+
+    function structuredColumnWidth(tree, spacing, viewMode) {
+      return Math.max(maxNodeWidth(tree, viewMode) + spacing.treeLeafGap, 230);
+    }
+
+    function structuredRowGap(spacing, viewMode) {
+      const base = Math.max(config.layout.nodeHeight + 30, spacing.treeLevelGap * 0.78);
+      return base;
+    }
+
+    function structuredContentHeight(tree, viewMode, spacing) {
+      const rowGap = structuredRowGap(spacing, viewMode);
+      const rootHeight = nodeSize(tree, viewMode).height;
+      let maxHeight = rootHeight;
+      tree.children.forEach((primary) => {
+        let previous = tree;
+        let branchHeight = rootHeight / 2 + rowGap + nodeSize(primary, viewMode).height / 2;
+        previous = primary;
+        primary.children.forEach((secondary) => {
+          branchHeight += nodeSize(previous, viewMode).height / 2 + rowGap + nodeSize(secondary, viewMode).height / 2;
+          previous = secondary;
+          secondary.children.forEach((leaf) => {
+            branchHeight += nodeSize(previous, viewMode).height / 2 + rowGap * 0.72 + nodeSize(leaf, viewMode).height / 2;
+            previous = leaf;
+          });
+        });
+        maxHeight = Math.max(maxHeight, branchHeight);
+      });
+      return maxHeight;
+    }
+
+    function stackNextY(currentY, previousNode, nextNode, gap, viewMode) {
+      return currentY + nodeSize(previousNode, viewMode).height / 2 + gap + nodeSize(nextNode, viewMode).height / 2;
+    }
+
+    function fillMissingStructured(nodes, positions, world) {
+      const missing = nodes.map(({ node }) => node).filter((node) => !positions.has(node.id));
+      if (!missing.length) return;
+      const center = { x: world.width / 2, y: world.height / 2 };
+      const fallbackRadius = Math.min(world.width, world.height) * 0.28;
+      const angles = spreadAngles(-Math.PI / 2, Math.PI * 2, missing.length);
+      missing.forEach((node, index) => positions.set(node.id, polarPoint(center, angles[index], fallbackRadius)));
     }
 
     function ringLayout(tree, nodes, world, spacing) {
@@ -249,6 +453,24 @@
         x: center.x + Math.cos(angle) * radius,
         y: center.y + Math.sin(angle) * radius
       };
+    }
+
+    function stableAngle(value) {
+      return stableUnit(value) * Math.PI * 2;
+    }
+
+    function stableUnit(value) {
+      const text = String(value || "");
+      let hash = 2166136261;
+      for (let index = 0; index < text.length; index += 1) {
+        hash ^= text.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+      }
+      return (hash >>> 0) / 4294967295;
+    }
+
+    function maxDepthForTree(tree) {
+      return Math.max(...model.visibleNodes(tree).map(({ node }) => node.depth), 0);
     }
 
     function compactRingRadii(tree, spacing, anglePlan) {
@@ -361,12 +583,12 @@
         Math.abs(second.point.y - first.point.y) < (first.size.height + second.size.height) / 2 + padding;
     }
 
-    function resolveNodeOverlaps(nodes, positions) {
+    function resolveNodeOverlaps(nodes, positions, viewMode) {
       const items = nodes
         .map(({ node }) => {
           const point = positions.get(node.id);
           if (!point) return null;
-          return { node, point, size: nodeSize(node) };
+          return { node, point, size: nodeSize(node, viewMode) };
         })
         .filter(Boolean);
       const padding = config.layout.overlapPadding;
@@ -417,12 +639,12 @@
       second.point.y += overlap.y / 2;
     }
 
-    function layoutBounds(nodes, positions) {
+    function layoutBounds(nodes, positions, viewMode) {
       const boxes = nodes
         .map(({ node }) => {
           const point = positions.get(node.id);
           if (!point) return null;
-          const size = nodeSize(node);
+          const size = nodeSize(node, viewMode);
           return {
             left: point.x - size.width / 2,
             right: point.x + size.width / 2,

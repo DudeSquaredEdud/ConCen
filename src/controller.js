@@ -100,7 +100,7 @@
     this.theme = "light";
     this.customTheme = storage.normalizeCustomTheme(null);
     this.branchColors = DEFAULT_BRANCH_COLORS.slice();
-    this.viewMode = "ring";
+    this.viewMode = "radial";
     this.viewport = { width: config.layout.minViewportWidth, height: config.layout.minViewportHeight };
     this.world = { width: config.layout.minViewportWidth, height: config.layout.minViewportHeight };
     this.currentBounds = null;
@@ -228,10 +228,11 @@
     });
 
     if (this.el.viewModeInput) {
-      this.el.viewModeInput.addEventListener("change", () => this.setViewMode(this.el.viewModeInput.checked ? "ring" : "tree"));
+      this.el.viewModeInput.addEventListener("change", () => this.setViewMode(this.el.viewModeInput.checked ? "radial" : "tree"));
     }
-    if (this.el.ringViewButton) this.el.ringViewButton.addEventListener("click", () => this.setViewMode("ring"));
     if (this.el.treeViewButton) this.el.treeViewButton.addEventListener("click", () => this.setViewMode("tree"));
+    if (this.el.radialViewButton) this.el.radialViewButton.addEventListener("click", () => this.setViewMode("radial"));
+    if (this.el.bookViewButton) this.el.bookViewButton.addEventListener("click", () => this.setViewMode("book"));
     if (this.el.zoomOutButton) this.el.zoomOutButton.addEventListener("click", () => this.zoomBy(0.85));
     if (this.el.zoomInButton) this.el.zoomInButton.addEventListener("click", () => this.zoomBy(1.18));
     if (this.el.fitViewButton) this.el.fitViewButton.addEventListener("click", () => this.fitCurrentView());
@@ -434,7 +435,7 @@
       this.addNode(true);
     } else if (this.keyToNavigationArrow(event)) {
       event.preventDefault();
-      const mode = event.shiftKey ? "outline" : this.appearance.navigationMode;
+      const mode = usesSpatialNavigation(this.viewMode) && !event.shiftKey ? "directional" : event.shiftKey ? "outline" : this.appearance.navigationMode;
       if (model.focusRelative(this.store, this.keyToNavigationArrow(event), this.positions, mode)) {
         this.actionBarOpen = false;
         this.afterTreeChange(false, true);
@@ -478,9 +479,9 @@
       this.zoomAt(event.clientX, event.clientY, event.deltaY);
       return;
     }
-    const amount = normalizeWheelDelta(event, event.shiftKey ? "x" : "y") / this.camera.scale;
-    if (event.shiftKey) this.camera.x += amount;
-    else this.camera.y += amount;
+    const delta = normalizedPanDelta(event);
+    this.camera.x += delta.x / this.camera.scale;
+    this.camera.y += delta.y / this.camera.scale;
     this.clampCamera();
     this.scheduleRender(false);
   };
@@ -648,7 +649,7 @@
     this.mind = model.createMindFromTree(this.store.tree);
     this.maps = [this.createMap(model.ROOT_ID, this.store.tree.label)];
     this.activeMapId = this.maps[0].id;
-    this.viewMode = "ring";
+    this.viewMode = "radial";
     this.spacing = storage.normalizeSpacing(null, config.spacingDefaults);
     this.appearance = storage.normalizeAppearance(null, config.appearanceDefaults);
     this.theme = "light";
@@ -696,7 +697,7 @@
 
   Controller.prototype.loadMap = function (map) {
     if (!map) return;
-    this.viewMode = map.viewMode;
+    this.viewMode = normalizeViewMode(map.viewMode);
     this.spacing = storage.normalizeSpacing(map.spacing, config.spacingDefaults);
     this.refreshViewTree(map.focusedId);
     this.cameraReady = false;
@@ -740,7 +741,7 @@
     this.maps = [this.createMap(model.ROOT_ID, this.store.tree.label)];
     this.activeMapId = this.maps[0].id;
     this.downMapStack = [];
-    this.viewMode = "ring";
+    this.viewMode = "radial";
     this.spacing = storage.normalizeSpacing(null, config.spacingDefaults);
     this.appearance = storage.normalizeAppearance(null, config.appearanceDefaults);
     this.hideEditor();
@@ -938,16 +939,17 @@
       height: Math.max(config.layout.minViewportHeight, rect.height || config.layout.minViewportHeight)
     };
 
-    const layout = this.layoutEngine.layout(this.store.tree, this.viewport, this.viewMode, this.spacing);
+    const layout = this.layoutEngine.layout(this.store.tree, this.viewport, this.viewMode, this.spacing, this.store.focusedId);
     this.world = layout.world;
     this.currentBounds = layout.bounds;
     this.positions = layout.positions;
     if (!this.cameraReady) {
-      this.centerCamera();
+      this.fitBounds(layout.bounds);
       this.cameraReady = true;
+    } else {
+      this.clampCamera();
+      if (this.shouldRevealFocus) this.revealFocus();
     }
-    this.clampCamera();
-    if (this.shouldRevealFocus) this.fitBounds(layout.bounds);
     const viewBox = this.viewBox();
     const animatedFocusId = this.previousRenderedFocusId && this.previousRenderedFocusId !== this.store.focusedId ? this.store.focusedId : null;
     const animatedNewId = this.animatedNewNodeId;
@@ -965,10 +967,12 @@
       showStatusMarkers: true,
       showPriorityMarkers: true,
       previousPositions: this.layoutAnimationPositions,
+      viewMode: this.viewMode,
       viewBox
     }, {
       focus: (id, event) => this.focusNode(id, event),
       edit: (id) => this.startEdit(id),
+      markdownAction: (action, event) => this.activateMarkdownAction(action, event),
       nodePointerDown: (event, id) => this.startNodeDrag(event, id)
     });
 
@@ -993,6 +997,25 @@
     this.afterTreeChange(false, true);
     if (event && (event.ctrlKey || event.metaKey)) this.openNoteSidebar();
     else this.el.svg.focus();
+  };
+
+  Controller.prototype.activateMarkdownAction = function (action) {
+    if (!action || !action.kind) return;
+    if (action.kind === "url") {
+      const href = cleanUrl(action.href || action.target);
+      if (!isHttpUrl(href)) return;
+      window.open(href, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (action.kind !== "node") return;
+    const target = String(action.target || "").trim();
+    const node = linkedNode(target, this.mind);
+    if (!node) {
+      this.updateStatus("Linked node not found");
+      return;
+    }
+    this.closeNoteSidebar(false);
+    this.focusSourceId(node.id);
   };
 
   Controller.prototype.scheduleRender = function (revealFocus) {
@@ -1080,10 +1103,13 @@
   };
 
   Controller.prototype.syncViewModeControls = function () {
-    const isRing = this.viewMode === "ring";
-    if (this.el.viewModeInput) this.el.viewModeInput.checked = isRing;
-    if (this.el.ringViewButton) this.el.ringViewButton.setAttribute("aria-pressed", String(isRing));
-    if (this.el.treeViewButton) this.el.treeViewButton.setAttribute("aria-pressed", String(!isRing));
+    const mode = normalizeViewMode(this.viewMode);
+    const isTree = mode === "tree";
+    const isRadial = mode === "radial";
+    if (this.el.viewModeInput) this.el.viewModeInput.checked = isRadial;
+    if (this.el.treeViewButton) this.el.treeViewButton.setAttribute("aria-pressed", String(isTree));
+    if (this.el.radialViewButton) this.el.radialViewButton.setAttribute("aria-pressed", String(isRadial));
+    if (this.el.bookViewButton) this.el.bookViewButton.setAttribute("aria-pressed", String(mode === "book"));
   };
 
   Controller.prototype.updatePathTrail = function () {
@@ -1139,6 +1165,7 @@
     document.documentElement.style.setProperty("--node-font-size", this.appearance.nodeFontSize + "px");
     document.documentElement.style.setProperty("--leaf-marker-font-size", Math.max(7, Math.round(this.appearance.nodeFontSize * 0.69)) + "px");
     document.documentElement.dataset.style = storage.normalizeStylePreset(this.appearance.stylePreset);
+    document.documentElement.dataset.view = normalizeViewMode(this.viewMode);
     this.applyStyleOverrides();
   };
 
@@ -1667,7 +1694,7 @@
       navigationMode: pack.navigationMode
     }), config.appearanceDefaults);
     this.spacing = storage.normalizeSpacing(Object.assign({}, this.spacing, pack.spacing || {}), config.spacingDefaults);
-    this.viewMode = pack.viewMode === "tree" ? "tree" : "ring";
+    this.viewMode = normalizeViewMode(pack.viewMode);
     this.shouldRevealFocus = true;
     this.applyTheme();
     this.applyAppearance();
@@ -1825,7 +1852,10 @@
       { kind: "command", title: "Toggle light/dark", detail: "Theme", run: () => this.toggleTheme() },
       { kind: "command", title: "Next style", detail: "Style theme", run: () => this.cycleStylePreset() },
       { kind: "command", title: "Next navigation mode", detail: "Arrow policy", run: () => this.cycleNavigationMode() },
-      { kind: "command", title: "Toggle grouped view", detail: "Layout", run: () => this.toggleViewMode() },
+      { kind: "command", title: "Next view mode", detail: "Flat, radial, book", run: () => this.toggleViewMode() },
+      { kind: "command", title: "Flat view", detail: "Single outer ring", run: () => this.setViewMode("tree") },
+      { kind: "command", title: "Radial view", detail: "Hierarchical scatter disk", run: () => this.setViewMode("radial") },
+      { kind: "command", title: "Book view", detail: "Chapters, sections, notes", run: () => this.setViewMode("book") },
       { kind: "command", title: "Undo", detail: "Ctrl+Z", run: () => this.undo() },
       { kind: "command", title: "Redo", detail: "Ctrl+Shift+Z", run: () => this.redo() }
     ];
@@ -1982,11 +2012,13 @@
   };
 
   Controller.prototype.toggleViewMode = function () {
-    this.setViewMode(this.viewMode === "ring" ? "tree" : "ring");
+    const modes = ["tree", "radial", "book"];
+    const index = modes.indexOf(this.viewMode);
+    this.setViewMode(modes[(index + 1) % modes.length]);
   };
 
   Controller.prototype.setViewMode = function (mode) {
-    const nextMode = mode === "tree" ? "tree" : "ring";
+    const nextMode = normalizeViewMode(mode);
     if (this.viewMode === nextMode) {
       this.syncViewModeControls();
       return;
@@ -2547,10 +2579,37 @@
   };
 
   function normalizeWheelDelta(event, axis) {
-    const raw = axis === "x" ? event.deltaX || event.deltaY : event.deltaY || event.deltaX;
+    const raw = axis === "x" ? event.deltaX : event.deltaY;
     if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) return raw * 16;
     if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) return raw * (axis === "x" ? window.innerWidth : window.innerHeight);
     return raw;
+  }
+
+  function normalizedPanDelta(event) {
+    let x = normalizeWheelDelta(event, "x");
+    let y = normalizeWheelDelta(event, "y");
+    if (event.shiftKey && Math.abs(x) < Math.abs(y)) {
+      x = y;
+      y = 0;
+    }
+    return {
+      x: clampWheelStep(x),
+      y: clampWheelStep(y)
+    };
+  }
+
+  function normalizeViewMode(mode) {
+    return ["tree", "radial", "book"].includes(mode) ? mode : "radial";
+  }
+
+  function usesSpatialNavigation(mode) {
+    return ["radial", "book"].includes(mode);
+  }
+
+  function clampWheelStep(value) {
+    if (!Number.isFinite(value)) return 0;
+    const maxStep = 240;
+    return utils.clampNumber(value, -maxStep, maxStep, 0);
   }
 
   function maxDepth(node) {

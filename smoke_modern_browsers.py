@@ -143,12 +143,33 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
         page.wait_for_timeout(150)
         if "Modern Smoke Root" not in (page.locator("#chartCanvas").text_content() or ""):
             raise AssertionError("Title rename did not update rendered root text")
+        page.locator("#chartCanvas").focus()
+        page.keyboard.press("Control+Enter")
+        page.locator("#noteInput").fill(
+            "# Smoke note heading\n"
+            "**Smoke note second line**\n"
+            "- [x] Smoke checked item\n"
+            "~~Smoke removed item~~\n"
+            "==Smoke highlighted item==\n"
+            "---\n"
+            "[Smoke link](https://example.com)\n"
+            "[[Modern Smoke Root|Root Link]]\n"
+            "![Smoke image](https://example.com/image.png)"
+        )
+        page.wait_for_timeout(150)
+        page.locator("#closeNoteButton").click()
 
         page.locator("#chartCanvas").focus()
         page.keyboard.press("Enter")
         page.wait_for_timeout(250)
         if page.locator("#chartCanvas .node").count() <= initial_nodes:
             raise AssertionError("Enter did not create child node")
+        page.locator("#chartCanvas").focus()
+        page.keyboard.press("Shift+ArrowUp")
+        page.keyboard.press("Enter")
+        page.wait_for_timeout(250)
+        if page.locator("#chartCanvas .node").count() <= initial_nodes + 1:
+            raise AssertionError("Second child node was not created")
 
         page.locator("#commandPaletteButton").click()
         page.wait_for_selector("#commandPalette:not([hidden])", timeout=3000)
@@ -158,18 +179,86 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
             raise AssertionError("Command palette returned no results")
         page.keyboard.press("Escape")
 
+        page.locator(".settings-menu > summary").click()
+        page.wait_for_selector(".settings-menu[open] .settings-panel", timeout=3000)
         page.locator("#treeViewButton").click()
         if page.locator("#treeViewButton").get_attribute("aria-pressed") != "true":
             raise AssertionError("Flat view button did not activate")
-        page.locator("#ringViewButton").click()
-        if page.locator("#ringViewButton").get_attribute("aria-pressed") != "true":
-            raise AssertionError("Ring view button did not activate")
+        for button_id, mode, label in [
+            ("#radialViewButton", "radial", "Radial"),
+            ("#bookViewButton", "book", "Book"),
+        ]:
+            page.locator(button_id).click()
+            page.wait_for_timeout(200)
+            if page.locator(button_id).get_attribute("aria-pressed") != "true":
+                raise AssertionError(f"{label} view button did not activate")
+            if page.evaluate("document.documentElement.dataset.view") != mode:
+                raise AssertionError(f"{label} view did not set dataset")
+            if page.locator("#chartCanvas .node").count() < 3:
+                raise AssertionError(f"{label} view rendered missing nodes")
+            if mode == "book":
+                canvas_text = page.locator("#chartCanvas").text_content() or ""
+                expected_markdown_text = [
+                    "Smoke note heading",
+                    "Smoke note second line",
+                    "☑ Smoke checked item",
+                    "Smoke removed item",
+                    "Smoke highlighted item",
+                    "────────────────",
+                    "Smoke link",
+                    "Root Link",
+                    "▣ Smoke image",
+                ]
+                if any(text not in canvas_text for text in expected_markdown_text):
+                    raise AssertionError("Book view did not render full markdown note text")
+                raw_markdown = ["# Smoke", "**Smoke note second line**", "- [x]", "~~Smoke", "==Smoke", "[Smoke link]", "[[Modern Smoke Root|Root Link]]", "![Smoke image]"]
+                if any(text in canvas_text for text in raw_markdown):
+                    raise AssertionError("Book view rendered raw markdown markers")
+                if page.locator("#chartCanvas .markdown-link[role='link']").count() < 2:
+                    raise AssertionError("Book view markdown links are not interactable")
+        page.locator("#radialViewButton").click()
+        page.wait_for_timeout(200)
+        focused_before = page.locator("#chartCanvas .node.focused .node-label").text_content()
+        page.locator("#chartCanvas").focus()
+        page.keyboard.press("ArrowRight")
+        page.wait_for_timeout(200)
+        focused_after = page.locator("#chartCanvas .node.focused .node-label").text_content()
+        if focused_before == focused_after:
+            raise AssertionError("Radial view arrow navigation did not move focus")
+        page.locator("#treeViewButton").click()
+        if page.locator("#treeViewButton").get_attribute("aria-pressed") != "true":
+            raise AssertionError("Flat view button did not reactivate after radial")
+        page.locator(".settings-menu > summary").click()
 
         page.locator("#zoomInButton").click()
         page.locator("#zoomOutButton").click()
         page.locator("#fitViewButton").click()
         if "Fit view" not in (page.locator("#statusText").text_content() or ""):
             raise AssertionError("Fit view control did not update status")
+        page.locator("#zoomInButton").click()
+        page.wait_for_timeout(150)
+        zoomed_viewbox = page.locator("#chartCanvas").get_attribute("viewBox")
+        page.locator("#chartCanvas .node").nth(1).click()
+        page.wait_for_timeout(150)
+        focused_viewbox = page.locator("#chartCanvas").get_attribute("viewBox")
+        if not zoomed_viewbox or not focused_viewbox:
+            raise AssertionError("Missing viewBox after zoom/focus")
+        zoomed_width = float(zoomed_viewbox.split()[2])
+        focused_width = float(focused_viewbox.split()[2])
+        if abs(zoomed_width - focused_width) > 0.01:
+            raise AssertionError(f"Node focus changed zoom: {zoomed_width} -> {focused_width}")
+        before_pan = page.locator("#chartCanvas").get_attribute("viewBox")
+        page.locator("#chartCanvas").dispatch_event("wheel", {"deltaX": 80, "deltaY": 60, "bubbles": True, "cancelable": True})
+        page.wait_for_timeout(150)
+        after_pan = page.locator("#chartCanvas").get_attribute("viewBox")
+        if not before_pan or not after_pan:
+            raise AssertionError("Missing viewBox after trackpad pan")
+        before_x, before_y, before_width = [float(value) for value in before_pan.split()[:3]]
+        after_x, after_y, after_width = [float(value) for value in after_pan.split()[:3]]
+        if abs(after_width - before_width) > 0.01:
+            raise AssertionError(f"Trackpad pan changed zoom: {before_width} -> {after_width}")
+        if abs(after_x - before_x) < 0.5 or abs(after_y - before_y) < 0.5:
+            raise AssertionError(f"Trackpad pan did not move both axes: {before_pan} -> {after_pan}")
 
         page.locator(".settings-menu > summary").click()
         page.locator("[data-layout-preset='wide']").click()

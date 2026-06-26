@@ -41,10 +41,6 @@
 
         <div class="toolbar-group utility-controls" aria-label="View controls">
           <output id="saveState" class="save-state" aria-live="polite">Autosaved</output>
-          <div class="segmented-control view-mode-control" role="group" aria-label="View mode">
-            <button id="ringViewButton" type="button" aria-pressed="true">Ring</button>
-            <button id="treeViewButton" type="button" aria-pressed="false">Flat</button>
-          </div>
           <div class="zoom-controls" role="group" aria-label="Zoom controls">
             <button id="zoomOutButton" class="icon-button" data-icon="−" type="button" title="Zoom out" aria-label="Zoom out">
               <span class="visually-hidden">Zoom Out</span>
@@ -114,6 +110,11 @@
               <div class="spacing-controls" aria-label="Spacing controls">
                 <div class="spacing-header">
                   <span class="settings-section-title">Layout</span>
+                  <div class="segmented-control view-mode-control" role="group" aria-label="View mode">
+                    <button id="treeViewButton" type="button" aria-pressed="false">Flat</button>
+                    <button id="radialViewButton" type="button" aria-pressed="false">Radial</button>
+                    <button id="bookViewButton" type="button" aria-pressed="false">Book</button>
+                  </div>
                   <div class="layout-preset-row" role="group" aria-label="Layout presets">
                     <button type="button" data-layout-preset="compact">Compact</button>
                     <button type="button" data-layout-preset="balanced">Balanced</button>

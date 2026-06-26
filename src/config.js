@@ -286,7 +286,7 @@
         theme: "sage",
         stylePreset: "index-card",
         navigationMode: "outline",
-        viewMode: "ring",
+        viewMode: "radial",
         nodeFontSize: 13,
         spacing: { treeLevelGap: 86, treeLeafGap: 122, ringBaseRadius: 118, ringDepthGap: 108, ringNodeGap: 30 }
       },
@@ -304,7 +304,7 @@
         theme: "ember",
         stylePreset: "radar",
         navigationMode: "directional",
-        viewMode: "ring",
+        viewMode: "radial",
         nodeFontSize: 12,
         spacing: { treeLevelGap: 78, treeLeafGap: 104, ringBaseRadius: 140, ringDepthGap: 132, ringNodeGap: 44 }
       },

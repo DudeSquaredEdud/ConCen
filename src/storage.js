@@ -109,7 +109,7 @@
       tree,
       focusedId: typeof saved.focusedId === "string" && model.findNode(tree, saved.focusedId) ? saved.focusedId : model.ROOT_ID,
       idCounter: Math.max(Number(saved.idCounter) || 1, model.nextId(tree)),
-	      viewMode: saved.viewMode ? (saved.viewMode === "ring" ? "ring" : "tree") : Number(saved.ring) >= 50 ? "ring" : "tree",
+      viewMode: normalizeViewMode(saved.viewMode, Number(saved.ring) >= 50 ? "radial" : "tree"),
       spacing: saved.spacing || null
     };
   }
@@ -121,7 +121,7 @@
         title: utils.cleanLabel(saved.title || mind.nodes[saved.rootNodeId].label) || "Chart Title",
         rootNodeId: saved.rootNodeId,
         focusedId: typeof saved.focusedId === "string" ? saved.focusedId : model.ROOT_ID,
-	        viewMode: saved.viewMode ? (saved.viewMode === "ring" ? "ring" : "tree") : "ring",
+        viewMode: normalizeViewMode(saved.viewMode, "radial"),
 	        spacing: saved.spacing || null
       };
     }
@@ -199,6 +199,11 @@
     const fallback = config.appearanceDefaults.navigationMode || "outline";
     const mode = String(value || fallback);
     return config.navigationModes[mode] ? mode : fallback;
+  }
+
+  function normalizeViewMode(value, fallback) {
+    const mode = String(value || fallback || "radial");
+    return ["tree", "radial", "book"].includes(mode) ? mode : "radial";
   }
 
   function normalizeBranchColors(input) {

@@ -7,11 +7,13 @@
   function Renderer(svg, layoutEngine) {
     this.svg = svg;
     this.layoutEngine = layoutEngine;
+    this.viewMode = "radial";
     this.viewBox = { x: 0, y: 0, width: config.layout.minViewportWidth, height: config.layout.minViewportHeight };
   }
 
   Renderer.prototype.render = function (data, handlers) {
     this.viewBox = data.viewBox;
+    this.viewMode = data.viewMode || "radial";
     this.svg.setAttribute("viewBox", `${data.viewBox.x} ${data.viewBox.y} ${data.viewBox.width} ${data.viewBox.height}`);
     this.svg.replaceChildren();
 
@@ -27,7 +29,7 @@
       node.children.forEach((child) => this.renderEdge(edgesLayer, pathEdgesLayer, defs, data.tree, node, child, data.positions, data.focusContext));
     });
     data.nodes.forEach(({ node, parent }) => {
-      this.renderNode(nodesLayer, data.tree, node, parent, data.positions.get(node.id), data.previousPositions && data.previousPositions.get(node.id), data.focusedId, data.animatedFocusId, data.animatedNewId, data.focusContext, data.mapRootIds, data.showStatusMarkers, data.showPriorityMarkers, handlers);
+      this.renderNode(nodesLayer, data.tree, node, parent, data.positions.get(node.id), data.previousPositions && data.previousPositions.get(node.id), data.focusedId, data.animatedFocusId, data.animatedNewId, data.focusContext, data.mapRootIds, data.showStatusMarkers, data.showPriorityMarkers, data.viewMode, handlers);
     });
   };
 
@@ -143,16 +145,16 @@
     return group;
   };
 
-  Renderer.prototype.renderNode = function (layer, tree, node, parent, point, previousPoint, focusedId, animatedFocusId, animatedNewId, focusContext, mapRootIds, showStatusMarkers, showPriorityMarkers, handlers) {
+  Renderer.prototype.renderNode = function (layer, tree, node, parent, point, previousPoint, focusedId, animatedFocusId, animatedNewId, focusContext, mapRootIds, showStatusMarkers, showPriorityMarkers, viewMode, handlers) {
     if (!point) return;
-    const size = this.layoutEngine.nodeSize(node);
+    const size = this.layoutEngine.nodeSize(node, viewMode);
     const color = renderColor(tree, node);
     const hasMap = Boolean(mapRootIds && mapRootIds.has(node.sourceId || node.id));
     const hasNote = Boolean(node.note && node.note.trim());
     const isSibling = Boolean(focusContext && focusContext.siblingIds && focusContext.siblingIds.has(node.id) && node.id !== focusedId);
     const isPathNode = Boolean(focusContext && focusContext.pathNodeIds && focusContext.pathNodeIds.has(node.id));
     const group = utils.svgEl("g", {
-      class: `node depth-${node.depth} ${node.depth === 3 ? "leaf" : ""} ${hasMap ? "has-map" : ""} ${hasNote ? "has-note" : ""} ${isSibling ? "sibling" : ""} ${isPathNode ? "path-node" : ""} ${node.id === focusedId ? "focused" : ""}`,
+      class: `node depth-${node.depth} view-${viewMode || "radial"} role-${viewRole(viewMode, node.depth)} ${node.depth === 3 ? "leaf" : ""} ${hasMap ? "has-map" : ""} ${hasNote ? "has-note" : ""} ${isSibling ? "sibling" : ""} ${isPathNode ? "path-node" : ""} ${node.id === focusedId ? "focused" : ""}`,
       transform: `translate(${point.x - size.width / 2}, ${point.y - size.height / 2})`,
       tabindex: "0",
       role: "button",
@@ -233,10 +235,46 @@
       group.append(marker);
     }
 
-    const label = utils.svgEl("text", { class: "node-label", x: size.width / 2, y: size.height / 2 });
-    label.textContent = node.label;
-    group.append(label);
+    this.renderNodeText(group, node, size, viewMode, handlers);
     layer.append(group);
+  };
+
+  Renderer.prototype.renderNodeText = function (group, node, size, viewMode, handlers) {
+    const profile = textProfile(viewMode, node.depth);
+    if (!profile) {
+      const label = utils.svgEl("text", { class: "node-label", x: size.width / 2, y: size.height / 2 });
+      label.textContent = node.label;
+      group.append(label);
+      return;
+    }
+
+    const labelLines = markdownLines(node.label, profile.labelChars, profile.labelLines, "heading");
+    const noteLines = markdownLines(node.note, profile.noteChars, profile.noteLines, "note");
+    const contentHeight = labelLines.length * profile.labelLineHeight +
+      (noteLines.length ? profile.noteGap + noteLines.length * profile.noteLineHeight : 0);
+    let y = Math.max(profile.padY, (size.height - contentHeight) / 2);
+    const x = profile.padX;
+    const label = utils.svgEl("text", {
+      class: "node-label",
+      x,
+      y: y + profile.labelLineHeight / 2,
+      "text-anchor": "start",
+      "dominant-baseline": "middle"
+    });
+    appendMarkdownTspans(label, labelLines, x, profile.labelLineHeight, handlers);
+    group.append(label);
+
+    if (!noteLines.length) return;
+    y += labelLines.length * profile.labelLineHeight + profile.noteGap;
+    const note = utils.svgEl("text", {
+      class: "node-note-preview",
+      x: profile.padX,
+      y: y + profile.noteLineHeight / 2,
+      "text-anchor": "start",
+      "dominant-baseline": "middle"
+    });
+    appendMarkdownTspans(note, noteLines, profile.padX, profile.noteLineHeight, handlers);
+    group.append(note);
   };
 
   Renderer.prototype.renderMetaMarker = function (group, node, size, showStatusMarkers, showPriorityMarkers) {
@@ -270,7 +308,7 @@
   };
 
   Renderer.prototype.editorRect = function (node, point, activeViewBox) {
-    const size = this.layoutEngine.nodeSize(node);
+    const size = this.layoutEngine.nodeSize(node, this.viewMode);
     const rect = this.svg.getBoundingClientRect();
     return {
       left: (point.x - size.width / 2 - activeViewBox.x) * (rect.width / activeViewBox.width),
@@ -282,6 +320,188 @@
 
   function renderColor(tree, node) {
     return node.depth === 0 ? "var(--root-node-fill)" : model.nodeColor(tree, node);
+  }
+
+  function viewRole(viewMode, depth) {
+    const roles = {
+      book: ["cover", "chapter", "section", "note"]
+    };
+    return (roles[viewMode] && roles[viewMode][depth]) || "node";
+  }
+
+  function textProfile(viewMode, depth) {
+    const profiles = {
+      book: {
+        0: { padX: 20, padY: 18, labelChars: 28, labelLines: 2, noteChars: 46, noteLines: Infinity, labelLineHeight: 18, noteLineHeight: 15, noteGap: 12 },
+        1: { padX: 18, padY: 15, labelChars: 24, labelLines: 2, noteChars: 42, noteLines: Infinity, labelLineHeight: 17, noteLineHeight: 14, noteGap: 10 },
+        2: { padX: 17, padY: 14, labelChars: 30, labelLines: 2, noteChars: 48, noteLines: Infinity, labelLineHeight: 16, noteLineHeight: 14, noteGap: 9 },
+        3: { padX: 15, padY: 13, labelChars: 26, labelLines: 2, noteChars: 40, noteLines: Infinity, labelLineHeight: 15, noteLineHeight: 13, noteGap: 8 }
+      }
+    };
+    return profiles[viewMode] && profiles[viewMode][depth];
+  }
+
+  function appendMarkdownTspans(text, lines, x, lineHeight, handlers) {
+    lines.forEach((line, lineIndex) => {
+      if (!line.segments.length) return;
+      let first = true;
+      line.segments.forEach((segment) => {
+        const attrs = {
+          dy: lineIndex === 0 && first ? 0 : first ? lineHeight : 0
+        };
+        if (first) attrs.x = x;
+        if (segment.bold || line.variant === "heading") attrs["font-weight"] = "900";
+        if (segment.italic || line.variant === "quote") attrs["font-style"] = "italic";
+        if (segment.strike) attrs["text-decoration"] = "line-through";
+        if (segment.code) attrs.class = "markdown-code";
+        if (segment.link) attrs.class = attrs.class ? attrs.class + " markdown-link" : "markdown-link";
+        if (segment.highlight) attrs.class = attrs.class ? attrs.class + " markdown-highlight" : "markdown-highlight";
+        const tspan = utils.svgEl("tspan", attrs);
+        tspan.textContent = segment.text;
+        if (segment.action && handlers.markdownAction) {
+          tspan.setAttribute("role", "link");
+          tspan.setAttribute("tabindex", "0");
+          tspan.addEventListener("click", (event) => {
+            event.stopPropagation();
+            handlers.markdownAction(segment.action, event);
+          });
+          tspan.addEventListener("pointerdown", (event) => {
+            event.stopPropagation();
+          });
+          tspan.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            event.stopPropagation();
+            handlers.markdownAction(segment.action, event);
+          });
+        }
+        text.append(tspan);
+        first = false;
+      });
+    });
+  }
+
+  function markdownLines(text, charsPerLine, maxLines, purpose) {
+    if (!charsPerLine || !maxLines) return [];
+    const clean = String(text || "").trim();
+    if (!clean) return [];
+    const limit = Number.isFinite(maxLines) ? maxLines : Infinity;
+    const result = [];
+    clean.split(/\n+/).forEach((rawLine) => {
+      const block = blockMarkdown(rawLine, purpose);
+      if (block.variant === "rule") {
+        result.push({ segments: [markdownSegment("─".repeat(Math.max(32, charsPerLine)))], variant: "rule" });
+        return;
+      }
+      wrapSegments(parseInlineMarkdown(block.text), charsPerLine).forEach((segments) => {
+        result.push({ segments, variant: block.variant });
+      });
+    });
+    return result.slice(0, limit);
+  }
+
+  function blockMarkdown(rawLine, purpose) {
+    let text = String(rawLine || "").trim();
+    let variant = purpose || "note";
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(text)) {
+      return { text: "", variant: "rule" };
+    }
+    if (/^\|.*\|$/.test(text)) {
+      return { text: text.replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim()).filter(Boolean).join("  •  "), variant };
+    }
+    const heading = text.match(/^(#{1,6})\s+(.+)$/);
+    if (heading) {
+      return { text: heading[2], variant: "heading" };
+    }
+    const task = text.match(/^[-*+]\s+\[([ xX])\]\s+(.+)$/);
+    if (task) {
+      return { text: (task[1].trim() ? "☑ " : "☐ ") + task[2], variant };
+    }
+    const unordered = text.match(/^[-*+]\s+(.+)$/);
+    if (unordered) {
+      return { text: "• " + unordered[1], variant };
+    }
+    const ordered = text.match(/^\d+[.)]\s+(.+)$/);
+    if (ordered) {
+      return { text: "• " + ordered[1], variant };
+    }
+    const quote = text.match(/^>\s+(.+)$/);
+    if (quote) {
+      return { text: quote[1], variant: "quote" };
+    }
+    return { text, variant };
+  }
+
+  function wrapSegments(segments, charsPerLine) {
+    const lines = [];
+    let line = [];
+    let length = 0;
+    segments.forEach((segment) => {
+      const words = segment.text.split(/(\s+)/).filter(Boolean);
+      words.forEach((word) => {
+        const isSpace = /^\s+$/.test(word);
+        const text = isSpace ? " " : word;
+        if (!isSpace && length > 0 && length + text.length > charsPerLine) {
+          lines.push(line);
+          line = [];
+          length = 0;
+        }
+        if (isSpace && length === 0) return;
+        pushSegment(line, Object.assign({}, segment, { text }));
+        length += text.length;
+      });
+    });
+    if (line.length) lines.push(line);
+    return lines.length ? lines : [[markdownSegment("")]];
+  }
+
+  function pushSegment(line, segment) {
+    const previous = line[line.length - 1];
+    if (previous &&
+      previous.bold === segment.bold &&
+      previous.italic === segment.italic &&
+      previous.code === segment.code &&
+      previous.strike === segment.strike &&
+      previous.highlight === segment.highlight &&
+      previous.link === segment.link &&
+      JSON.stringify(previous.action) === JSON.stringify(segment.action)) {
+      previous.text += segment.text;
+      return;
+    }
+    line.push(segment);
+  }
+
+  function parseInlineMarkdown(text) {
+    const source = String(text || "");
+    const segments = [];
+    const pattern = /(\*\*([^*]+)\*\*)|(__([^_]+)__)|(~~([^~]+)~~)|(==([^=]+)==)|(`([^`]+)`)|(!\[([^\]]*)\]\([^)]+\))|(\*([^*]+)\*)|(_([^_]+)_)|(\[([^\]]+)\]\([^)]+\))|(\[\[([^\]|]+)\|([^\]]+)\]\])|(\[\[([^\]]+)\]\])/g;
+    let cursor = 0;
+    let match;
+    while ((match = pattern.exec(source))) {
+      if (match.index > cursor) segments.push(markdownSegment(source.slice(cursor, match.index)));
+      if (match[2]) segments.push(markdownSegment(match[2], { bold: true }));
+      else if (match[4]) segments.push(markdownSegment(match[4], { bold: true }));
+      else if (match[6]) segments.push(markdownSegment(match[6], { strike: true }));
+      else if (match[8]) segments.push(markdownSegment(match[8], { highlight: true }));
+      else if (match[10]) segments.push(markdownSegment(match[10], { code: true }));
+      else if (match[12] !== undefined) segments.push(markdownSegment("▣ " + (match[12] || "image"), { italic: true }));
+      else if (match[14]) segments.push(markdownSegment(match[14], { italic: true }));
+      else if (match[16]) segments.push(markdownSegment(match[16], { italic: true }));
+      else if (match[18]) segments.push(markdownSegment(match[18], { link: true, action: { kind: "url", href: match[0].match(/\(([^)]+)\)$/)[1] } }));
+      else if (match[21]) segments.push(markdownSegment(match[21], { link: true, action: { kind: "node", target: match[20] } }));
+      else if (match[23]) segments.push(markdownSegment(match[23], { link: true, action: { kind: isHttpUrl(match[23]) ? "url" : "node", href: match[23], target: match[23] } }));
+      cursor = pattern.lastIndex;
+    }
+    if (cursor < source.length) segments.push(markdownSegment(source.slice(cursor)));
+    return segments.length ? segments : [markdownSegment(source)];
+  }
+
+  function markdownSegment(text, attrs) {
+    return Object.assign({ text, bold: false, italic: false, code: false, strike: false, highlight: false, link: false, action: null }, attrs || {});
+  }
+
+  function isHttpUrl(value) {
+    return /^https?:\/\/\S+$/i.test(String(value || "").trim());
   }
 
   function pencilPath(id, from, to, index) {

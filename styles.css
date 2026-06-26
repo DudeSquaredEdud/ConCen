@@ -765,6 +765,10 @@ summary:focus-visible,
   background: var(--surface-recessed);
 }
 
+.view-mode-control {
+  flex-wrap: wrap;
+}
+
 .segmented-control button,
 .zoom-controls button {
   min-height: 26px;
@@ -774,7 +778,7 @@ summary:focus-visible,
 }
 
 .segmented-control button {
-  min-width: 48px;
+  min-width: 56px;
   padding: 0 11px;
 }
 
@@ -2251,6 +2255,7 @@ button:disabled:hover {
 
 .node.focus-pop .node-box,
 .node.focus-pop .node-label,
+.node.focus-pop .node-note-preview,
 .node.focus-pop .leaf-marker,
 .node.focus-pop .note-marker,
 .node.focus-pop .map-marker {
@@ -2261,6 +2266,7 @@ button:disabled:hover {
 
 .node.node-enter .node-box,
 .node.node-enter .node-label,
+.node.node-enter .node-note-preview,
 .node.node-enter .leaf-marker,
 .node.node-enter .note-marker,
 .node.node-enter .map-marker {
@@ -2402,6 +2408,62 @@ button:disabled:hover {
 
 .node.depth-0 .node-label {
   fill: var(--root-node-ink);
+}
+
+.node.view-book text {
+  text-anchor: start;
+}
+
+.node.view-book .node-label {
+  font-weight: 850;
+}
+
+.node .node-note-preview {
+  fill: var(--muted);
+  font-size: max(10px, calc(var(--node-font-size) - 2px));
+  font-weight: 520;
+  line-height: 1.25;
+  opacity: 0.94;
+}
+
+.node.depth-0 .node-note-preview {
+  fill: var(--root-node-ink);
+  opacity: 0.78;
+}
+
+.node.view-book .markdown-code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.92em;
+  font-weight: 700;
+}
+
+.node.view-book .markdown-link {
+  text-decoration: underline;
+  text-decoration-thickness: 1.2px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.node.view-book .markdown-highlight {
+  fill: var(--node-ink);
+  font-weight: 850;
+}
+
+.node.view-book.role-cover .node-box {
+  stroke-width: 2.2;
+}
+
+.node.view-book.role-chapter .node-box {
+  stroke-width: 1.8;
+}
+
+.node.view-book.role-section .node-box,
+.node.view-book.role-note .node-box {
+  fill: color-mix(in srgb, var(--node-fill) 92%, var(--canvas-bg));
+}
+
+.node.view-book.role-note .node-box {
+  stroke-dasharray: 4 3;
 }
 
 .node .leaf-marker {
@@ -2553,7 +2615,7 @@ button:disabled:hover {
   }
 
   .utility-controls {
-    grid-template-columns: minmax(0, 1fr) repeat(3, 38px);
+    grid-template-columns: minmax(0, 1fr) minmax(112px, auto) repeat(3, 38px);
     align-items: center;
   }
 
@@ -2564,15 +2626,15 @@ button:disabled:hover {
   }
 
   .utility-controls #commandPaletteButton {
-    grid-column: 2;
-  }
-
-  .utility-controls .mind-menu {
     grid-column: 3;
   }
 
-  .utility-controls .settings-menu {
+  .utility-controls .mind-menu {
     grid-column: 4;
+  }
+
+  .utility-controls .settings-menu {
+    grid-column: 5;
   }
 
   .utility-controls .mind-menu,
@@ -2585,14 +2647,21 @@ button:disabled:hover {
     width: 100%;
   }
 
-  .segmented-control,
   .zoom-controls {
-    grid-column: 1 / -1;
+    grid-column: 2;
     width: 100%;
   }
 
-  .segmented-control button,
   .zoom-controls button {
+    width: 100%;
+    min-height: 32px;
+  }
+
+  .segmented-control {
+    width: 100%;
+  }
+
+  .segmented-control button {
     width: 100%;
     min-height: 32px;
   }
