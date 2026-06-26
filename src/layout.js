@@ -107,6 +107,7 @@
         .replace(/^\d+[.)]\s+/gm, "• ")
         .replace(/^>\s+/gm, "")
         .replace(/^(-{3,}|\*{3,}|_{3,})$/gm, "────────────────")
+        .replace(/^\|?(\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?$/gm, "")
         .replace(/^\|(.+)\|$/gm, (match) => match.replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim()).filter(Boolean).join(" • "))
         .replace(/[*_`~=]/g, "")
         .trim();

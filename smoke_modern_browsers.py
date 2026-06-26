@@ -154,6 +154,9 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
             "~~Smoke removed item~~\n"
             "==Smoke highlighted item==\n"
             "---\n"
+            "| Metric | Value |\n"
+            "| --- | --- |\n"
+            "| Speed | Fast |\n"
             "[Smoke link](https://example.com)\n"
             "[[Modern Smoke Root|Root Link]]\n"
             "![Smoke image](https://example.com/image.png)"
@@ -239,13 +242,17 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
                     "Smoke removed item",
                     "Smoke highlighted item",
                     "────────────────",
+                    "Metric",
+                    "Value",
+                    "Speed",
+                    "Fast",
                     "Smoke link",
                     "Root Link",
                     "▣ Smoke image",
                 ]
                 if any(text not in canvas_text for text in expected_markdown_text):
                     raise AssertionError("Book view did not render full markdown note text")
-                raw_markdown = ["# Smoke", "**Smoke note second line**", "- [x]", "~~Smoke", "==Smoke", "[Smoke link]", "[[Modern Smoke Root|Root Link]]", "![Smoke image]"]
+                raw_markdown = ["# Smoke", "**Smoke note second line**", "- [x]", "~~Smoke", "==Smoke", "| --- | --- |", "—  •  —", "[Smoke link]", "[[Modern Smoke Root|Root Link]]", "![Smoke image]"]
                 if any(text in canvas_text for text in raw_markdown):
                     raise AssertionError("Book view rendered raw markdown markers")
                 if page.locator("#chartCanvas .markdown-link[role='link']").count() < 2:

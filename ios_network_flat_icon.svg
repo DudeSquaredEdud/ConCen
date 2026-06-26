@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Flat iOS-style network icon</title>
+  <desc id="desc">A flat-color rounded square app icon with a concentric network emblem.</desc>
+  <rect x="64" y="64" width="896" height="896" rx="210" fill="#9A9B94"/>
+
+  <g fill="none" stroke="#F7F0E6" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+    <!-- concentric orbit rings -->
+    <circle cx="512" cy="512" r="332"/>
+    <circle cx="512" cy="512" r="232"/>
+    <circle cx="512" cy="512" r="134"/>
+
+    <!-- radial / network connectors -->
+    <path d="M512 180 L512 844"/>
+    <path d="M278 746 L746 278"/>
+    <path d="M360 360 L670 670"/>
+    <path d="M376 648 L512 512 L648 376"/>
+    <path d="M512 512 L648 648"/>
+  </g>
+
+  <!-- central hub -->
+  <circle cx="512" cy="512" r="76" fill="#F7F0E6"/>
+
+  <!-- orbit nodes -->
+  <g fill="#F7F0E6">
+    <circle cx="512" cy="180" r="40"/>
+    <circle cx="747" cy="277" r="30"/>
+    <circle cx="844" cy="512" r="30"/>
+    <circle cx="512" cy="844" r="40"/>
+    <circle cx="278" cy="746" r="30"/>
+    <circle cx="180" cy="512" r="30"/>
+
+    <circle cx="512" cy="280" r="30"/>
+    <circle cx="676" cy="348" r="30"/>
+    <circle cx="676" cy="676" r="40"/>
+    <circle cx="512" cy="744" r="30"/>
+    <circle cx="348" cy="676" r="30"/>
+    <circle cx="348" cy="348" r="40"/>
+  </g>
+</svg>

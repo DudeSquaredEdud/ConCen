@@ -682,37 +682,28 @@ summary:focus-visible,
 }
 
 .concen-logo {
-  position: relative;
-  display: grid;
-  place-items: center;
   width: 30px;
   height: 30px;
   border: 1px solid var(--hairline);
-  border-radius: 999px;
-  background: var(--field);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--field) 62%, var(--focus) 38%);
   box-shadow: var(--shadow-sm);
   color: var(--control-ink);
   overflow: hidden;
+  flex: 0 0 auto;
 }
 
-.concen-logo span {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-weight: 820;
-  line-height: 1;
-  transform-origin: center;
+.concen-logo-bg {
+  fill: color-mix(in srgb, var(--field) 62%, var(--focus) 38%);
 }
 
-.concen-logo span:first-child {
-  font-size: 25px;
-  transform: translateX(-1px);
+.concen-logo-lines {
+  stroke: currentColor;
 }
 
-.concen-logo span:last-child {
-  font-size: 15px;
-  transform: translateX(-0.5px);
+.concen-logo-mark,
+.concen-logo-nodes {
+  fill: currentColor;
 }
 
 .toolbar-group {

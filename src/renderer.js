@@ -350,12 +350,14 @@
           dy: lineIndex === 0 && first ? 0 : first ? lineHeight : 0
         };
         if (first) attrs.x = x;
-        if (segment.bold || line.variant === "heading") attrs["font-weight"] = "900";
+        if (segment.bold || line.variant === "heading" || line.variant === "table-heading") attrs["font-weight"] = "900";
         if (segment.italic || line.variant === "quote") attrs["font-style"] = "italic";
         if (segment.strike) attrs["text-decoration"] = "line-through";
         if (segment.code) attrs.class = "markdown-code";
         if (segment.link) attrs.class = attrs.class ? attrs.class + " markdown-link" : "markdown-link";
         if (segment.highlight) attrs.class = attrs.class ? attrs.class + " markdown-highlight" : "markdown-highlight";
+        if (segment.tableCell) attrs.class = attrs.class ? attrs.class + " markdown-table-cell" : "markdown-table-cell";
+        if (segment.cellX !== null && segment.cellX !== undefined) attrs.x = x + segment.cellX;
         const tspan = utils.svgEl("tspan", attrs);
         tspan.textContent = segment.text;
         if (segment.action && handlers.markdownAction) {
@@ -387,17 +389,95 @@
     if (!clean) return [];
     const limit = Number.isFinite(maxLines) ? maxLines : Infinity;
     const result = [];
-    clean.split(/\n+/).forEach((rawLine) => {
+    const rawLines = clean.split(/\n+/);
+    for (let lineIndex = 0; lineIndex < rawLines.length; lineIndex += 1) {
+      const rawLine = rawLines[lineIndex];
+      const table = markdownTableLines(rawLines, lineIndex, charsPerLine);
+      if (table) {
+        table.lines.forEach((line) => result.push(line));
+        lineIndex += table.consumed - 1;
+        continue;
+      }
       const block = blockMarkdown(rawLine, purpose);
       if (block.variant === "rule") {
         result.push({ segments: [markdownSegment("─".repeat(Math.max(32, charsPerLine)))], variant: "rule" });
-        return;
+        continue;
       }
       wrapSegments(parseInlineMarkdown(block.text), charsPerLine).forEach((segments) => {
         result.push({ segments, variant: block.variant });
       });
-    });
+    }
     return result.slice(0, limit);
+  }
+
+  function markdownTableLines(rawLines, startIndex, charsPerLine) {
+    const header = parseTableRow(rawLines[startIndex]);
+    const separator = parseTableRow(rawLines[startIndex + 1]);
+    if (!header || !separator || !isTableSeparator(separator.cells)) return null;
+
+    const rows = [header.cells];
+    let cursor = startIndex + 2;
+    while (cursor < rawLines.length) {
+      const row = parseTableRow(rawLines[cursor]);
+      if (!row) break;
+      rows.push(row.cells);
+      cursor += 1;
+    }
+
+    const colCount = Math.max(1, ...rows.map((row) => row.length));
+    const gapChars = 3;
+    const cellChars = Math.max(4, Math.floor((charsPerLine - (colCount - 1) * gapChars) / colCount));
+    const cellStep = Math.max(44, (cellChars + gapChars) * 7);
+    const lines = [];
+
+    rows.forEach((cells, rowIndex) => {
+      lines.push({
+        segments: tableSegments(cells, colCount, cellChars, cellStep),
+        variant: rowIndex === 0 ? "table-heading" : "table"
+      });
+      if (rowIndex === 0) {
+        lines.push({
+          segments: [markdownSegment("─".repeat(Math.max(18, Math.min(charsPerLine, colCount * cellChars + (colCount - 1) * gapChars))))],
+          variant: "table-rule"
+        });
+      }
+    });
+
+    return { lines, consumed: Math.max(2, cursor - startIndex) };
+  }
+
+  function parseTableRow(rawLine) {
+    const text = String(rawLine || "").trim();
+    if (!text || !text.includes("|")) return null;
+    const body = text.replace(/^\|/, "").replace(/\|$/, "");
+    const cells = body.split("|").map((cell) => cell.trim());
+    if (cells.length < 2) return null;
+    return { cells };
+  }
+
+  function isTableSeparator(cells) {
+    return cells.length > 1 && cells.every((cell) => /^:?-{3,}:?$/.test(cell.trim()));
+  }
+
+  function tableSegments(cells, colCount, cellChars, cellStep) {
+    const segments = [];
+    for (let index = 0; index < colCount; index += 1) {
+      const cell = ellipsize(cells[index] || "", cellChars);
+      const parsed = parseInlineMarkdown(cell);
+      parsed.forEach((segment, segmentIndex) => {
+        segments.push(Object.assign({}, segment, {
+          tableCell: true,
+          cellX: segmentIndex === 0 ? index * cellStep : null
+        }));
+      });
+    }
+    return segments.length ? segments : [markdownSegment("")];
+  }
+
+  function ellipsize(value, maxChars) {
+    const text = String(value || "").trim();
+    if (text.length <= maxChars) return text;
+    return text.slice(0, Math.max(1, maxChars - 1)).trimEnd() + "…";
   }
 
   function blockMarkdown(rawLine, purpose) {

@@ -4,16 +4,41 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>ConCen</title>
+    <link rel="icon" type="image/svg+xml" href="ios_network_flat_icon.svg">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
     <main class="app-shell">
       <header class="toolbar" aria-label="ConCen controls">
         <div class="brand-lockup" aria-label="ConCen">
-          <span class="concen-logo" aria-hidden="true">
-            <span>C</span>
-            <span>C</span>
-          </span>
+          <svg class="concen-logo" viewBox="0 0 1024 1024" aria-hidden="true" focusable="false">
+            <rect class="concen-logo-bg" x="64" y="64" width="896" height="896" rx="210"/>
+            <g class="concen-logo-lines" fill="none" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="512" cy="512" r="332"/>
+              <circle cx="512" cy="512" r="232"/>
+              <circle cx="512" cy="512" r="134"/>
+              <path d="M512 180 L512 844"/>
+              <path d="M278 746 L746 278"/>
+              <path d="M360 360 L670 670"/>
+              <path d="M376 648 L512 512 L648 376"/>
+              <path d="M512 512 L648 648"/>
+            </g>
+            <circle class="concen-logo-mark" cx="512" cy="512" r="76"/>
+            <g class="concen-logo-nodes">
+              <circle cx="512" cy="180" r="40"/>
+              <circle cx="747" cy="277" r="30"/>
+              <circle cx="844" cy="512" r="30"/>
+              <circle cx="512" cy="844" r="40"/>
+              <circle cx="278" cy="746" r="30"/>
+              <circle cx="180" cy="512" r="30"/>
+              <circle cx="512" cy="280" r="30"/>
+              <circle cx="676" cy="348" r="30"/>
+              <circle cx="676" cy="676" r="40"/>
+              <circle cx="512" cy="744" r="30"/>
+              <circle cx="348" cy="676" r="30"/>
+              <circle cx="348" cy="348" r="40"/>
+            </g>
+          </svg>
           <span class="brand-name">ConCen</span>
         </div>
         <div class="toolbar-group map-controls" aria-label="Map controls">
@@ -281,7 +306,7 @@
             </div>
             <output id="welcomeStats" class="welcome-stats"></output>
           </div>
-          <p>Build ring maps, write linked notes, and move ideas around without losing structure.</p>
+          <p>Concentric Concepts, for Concentration</p>
           <div class="welcome-section">
             <span class="welcome-label">Guided start</span>
             <div class="welcome-tutorial">
