@@ -132,6 +132,8 @@
     this.saveStateTimer = null;
     this.recentMinds = [];
     this.githubSync = loadGithubSyncConfig();
+    this.ctrlHoldTimer = null;
+    this.ctrlOnlyDown = false;
   }
 
   Controller.prototype.start = function () {
@@ -194,6 +196,12 @@
     this.el.commandInput.addEventListener("keydown", (event) => this.handleCommandKey(event));
     this.el.commandPalette.addEventListener("pointerdown", (event) => {
       if (event.target === this.el.commandPalette) this.closeCommandPalette();
+    });
+    if (this.el.brandLogoButton) this.el.brandLogoButton.addEventListener("click", () => this.openWelcome());
+    if (this.el.shortcutSheetButton) this.el.shortcutSheetButton.addEventListener("click", () => this.openShortcutSheet());
+    if (this.el.shortcutSheetCloseButton) this.el.shortcutSheetCloseButton.addEventListener("click", () => this.closeShortcutSheet());
+    if (this.el.shortcutSheet) this.el.shortcutSheet.addEventListener("pointerdown", (event) => {
+      if (event.target === this.el.shortcutSheet) this.closeShortcutSheet();
     });
     if (this.el.welcomeCloseButton) this.el.welcomeCloseButton.addEventListener("click", () => this.closeWelcome());
     if (this.el.welcomeCommandButton) this.el.welcomeCommandButton.addEventListener("click", () => {
@@ -471,6 +479,7 @@
   };
 
   Controller.prototype.handleDocumentPointerDown = function (event) {
+    this.cancelShortcutHold();
     if (!this.actionBarOpen) return;
     const target = event.target;
     if (this.el.nodeActionBar && this.el.nodeActionBar.contains(target)) return;
@@ -496,7 +505,13 @@
 
   Controller.prototype.handleGlobalKeyDown = function (event) {
     if (event.defaultPrevented) return;
+    this.trackShortcutHold(event);
     const editableTarget = utils.isEditableTarget(document.activeElement);
+    if (event.key === "Escape" && this.el.shortcutSheet && !this.el.shortcutSheet.hidden) {
+      event.preventDefault();
+      this.closeShortcutSheet();
+      return;
+    }
     if (event.key === "Escape" && this.nodeDrag) {
       event.preventDefault();
       this.cancelNodeDrag();
@@ -542,6 +557,7 @@
   };
 
   Controller.prototype.handleGlobalKeyUp = function (event) {
+    if (event.key === "Control") this.cancelShortcutHold();
     if (event.code !== "Space") return;
     this.isSpaceDown = false;
     this.el.svg.classList.remove("space-pan-ready");
@@ -550,8 +566,34 @@
 
   Controller.prototype.clearPanKeys = function () {
     this.isSpaceDown = false;
+    this.cancelShortcutHold();
     this.el.svg.classList.remove("space-pan-ready");
     this.endPan();
+  };
+
+  Controller.prototype.trackShortcutHold = function (event) {
+    if (event.key === "Control" && !event.repeat && !event.altKey && !event.metaKey && !event.shiftKey) {
+      if (utils.isEditableTarget(document.activeElement)) return;
+      if (this.el.commandPalette && !this.el.commandPalette.hidden) return;
+      if (this.el.welcomeDialog && !this.el.welcomeDialog.hidden) return;
+      if (this.el.shortcutSheet && !this.el.shortcutSheet.hidden) return;
+      this.cancelShortcutHold();
+      this.ctrlOnlyDown = true;
+      this.ctrlHoldTimer = setTimeout(() => {
+        if (!this.ctrlOnlyDown) return;
+        this.openShortcutSheet();
+      }, 2000);
+      return;
+    }
+    if (event.key !== "Control") this.cancelShortcutHold();
+  };
+
+  Controller.prototype.cancelShortcutHold = function () {
+    this.ctrlOnlyDown = false;
+    if (this.ctrlHoldTimer) {
+      clearTimeout(this.ctrlHoldTimer);
+      this.ctrlHoldTimer = null;
+    }
   };
 
   Controller.prototype.addNode = function (editAfterAdd) {
@@ -1643,6 +1685,23 @@
     this.el.svg.focus();
   };
 
+  Controller.prototype.openShortcutSheet = function () {
+    this.cancelShortcutHold();
+    if (!this.el.shortcutSheet) return;
+    if (this.el.commandPalette) this.el.commandPalette.hidden = true;
+    this.el.shortcutSheet.hidden = false;
+    requestAnimationFrame(() => {
+      if (this.el.shortcutSheetCloseButton) this.el.shortcutSheetCloseButton.focus();
+    });
+  };
+
+  Controller.prototype.closeShortcutSheet = function () {
+    this.cancelShortcutHold();
+    if (!this.el.shortcutSheet) return;
+    this.el.shortcutSheet.hidden = true;
+    this.el.svg.focus();
+  };
+
   Controller.prototype.showWelcomeIfNeeded = function () {
     if (!this.el.welcomeDialog) return;
     let seen = false;
@@ -1657,6 +1716,8 @@
 
   Controller.prototype.openWelcome = function () {
     if (!this.el.welcomeDialog) return;
+    if (this.el.shortcutSheet) this.el.shortcutSheet.hidden = true;
+    if (this.el.commandPalette) this.el.commandPalette.hidden = true;
     this.renderWelcome();
     this.el.welcomeDialog.hidden = false;
     requestAnimationFrame(() => {
@@ -1858,6 +1919,7 @@
     const commands = [
       { kind: "command", title: "Add child", detail: "Enter", run: () => this.addNode(true) },
       { kind: "command", title: "Show welcome", detail: "Templates, recents, shortcuts", run: () => this.openWelcome() },
+      { kind: "command", title: "Show shortcuts", detail: "Hold Ctrl", run: () => this.openShortcutSheet() },
       { kind: "command", title: "Find node", detail: "Type any node, note, tag, status, or priority", run: () => this.updateStatus("Type to search nodes and notes") },
       { kind: "command", title: "Move focus", detail: "Arrows, WASD, HJKL", run: () => this.updateStatus("Move focus: arrows, WASD, or HJKL") },
       { kind: "command", title: "Tree movement", detail: "Shift+Arrow", run: () => this.updateStatus("Tree movement: Shift+Arrow") },

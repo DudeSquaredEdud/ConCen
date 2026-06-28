@@ -670,10 +670,17 @@ summary:focus-visible,
   align-items: center;
   gap: 8px;
   min-height: 38px;
-  padding: 4px 10px 4px 6px;
+  border: 0;
+  padding: 4px;
+  background: transparent;
   color: var(--ink);
   font-weight: 760;
   letter-spacing: 0;
+  box-shadow: none;
+}
+
+.brand-lockup:hover {
+  background: color-mix(in srgb, var(--field) 70%, transparent);
 }
 
 .brand-name {
@@ -1615,6 +1622,7 @@ button:disabled:hover {
 }
 
 .command-palette,
+.shortcut-sheet,
 .welcome-dialog {
   position: fixed;
   inset: 0;
@@ -1630,11 +1638,13 @@ button:disabled:hover {
 }
 
 .command-palette[hidden],
+.shortcut-sheet[hidden],
 .welcome-dialog[hidden] {
   display: none;
 }
 
 .palette-panel,
+.shortcut-panel,
 .welcome-panel {
   width: min(620px, calc(100vw - 28px));
   overflow: hidden;
@@ -1651,6 +1661,53 @@ button:disabled:hover {
 .welcome-dialog {
   align-items: center;
   padding: 24px;
+}
+
+.shortcut-sheet {
+  align-items: center;
+  padding: 24px;
+}
+
+.shortcut-panel {
+  display: grid;
+  gap: 14px;
+  width: min(420px, calc(100vw - 28px));
+  padding: 16px;
+}
+
+.shortcut-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.shortcut-grid span {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.shortcut-grid kbd {
+  min-height: 24px;
+  padding: 5px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--field) 78%, transparent);
+  color: var(--control-ink);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: var(--shadow-sm);
 }
 
 .welcome-panel {

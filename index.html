@@ -10,7 +10,7 @@
   <body>
     <main class="app-shell">
       <header class="toolbar" aria-label="ConCen controls">
-        <div class="brand-lockup" aria-label="ConCen">
+        <button id="brandLogoButton" class="brand-lockup" type="button" title="Show welcome" aria-label="Show welcome">
           <svg class="concen-logo" viewBox="0 0 1024 1024" aria-hidden="true" focusable="false">
             <rect class="concen-logo-bg" x="64" y="64" width="896" height="896" rx="210"/>
             <g class="concen-logo-lines" fill="none" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
@@ -39,8 +39,7 @@
               <circle cx="348" cy="348" r="40"/>
             </g>
           </svg>
-          <span class="brand-name">ConCen</span>
-        </div>
+        </button>
         <div class="toolbar-group map-controls" aria-label="Map controls">
           <label class="map-field">
             <span>Map</span>
@@ -79,6 +78,9 @@
           </div>
           <button id="commandPaletteButton" class="icon-button" data-icon="⌘" type="button" title="Search and commands (Ctrl+K)" aria-label="Search and commands">
             <span class="visually-hidden">Search and Commands</span>
+          </button>
+          <button id="shortcutSheetButton" class="icon-button" data-icon="?" type="button" title="Shortcuts" aria-label="Shortcuts">
+            <span class="visually-hidden">Shortcuts</span>
           </button>
           <details class="mind-menu command-menu">
             <summary class="icon-button" data-icon="◌" title="Mind actions" aria-label="Mind actions">
@@ -295,6 +297,29 @@
         <div class="palette-panel">
           <input id="commandInput" type="search" autocomplete="off" placeholder="Search nodes, notes, or commands">
           <div id="commandResults" class="command-results"></div>
+        </div>
+      </div>
+      <div id="shortcutSheet" class="shortcut-sheet" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" hidden>
+        <div class="shortcut-panel">
+          <div class="shortcut-head">
+            <span class="welcome-label">Shortcuts</span>
+            <button id="shortcutSheetCloseButton" class="icon-button" data-icon="×" type="button" aria-label="Close shortcuts">
+              <span class="visually-hidden">Close Shortcuts</span>
+            </button>
+          </div>
+          <div class="shortcut-grid">
+            <span>Search commands</span><kbd>Ctrl K</kbd>
+            <span>Open notes</span><kbd>Ctrl Enter</kbd>
+            <span>Create parent</span><kbd>Ctrl Shift Enter</kbd>
+            <span>Parent map</span><kbd>Ctrl ←</kbd>
+            <span>Child map</span><kbd>Ctrl →</kbd>
+            <span>Open node map</span><kbd>Alt Enter</kbd>
+            <span>Rename node</span><kbd>Shift Enter</kbd>
+            <span>Undo</span><kbd>Ctrl Z</kbd>
+            <span>Redo</span><kbd>Ctrl Shift Z</kbd>
+            <span>Pan canvas</span><kbd>Space drag</kbd>
+            <span>Show this sheet</span><kbd>Hold Ctrl</kbd>
+          </div>
         </div>
       </div>
       <div id="welcomeDialog" class="welcome-dialog" role="dialog" aria-modal="true" aria-label="Welcome to ConCen" hidden>
