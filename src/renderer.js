@@ -9,13 +9,17 @@
     this.layoutEngine = layoutEngine;
     this.viewMode = "radial";
     this.viewBox = { x: 0, y: 0, width: config.layout.minViewportWidth, height: config.layout.minViewportHeight };
+    this.handlers = null;
+    this.bindEvents();
   }
 
   Renderer.prototype.render = function (data, handlers) {
+    this.handlers = handlers;
     this.viewBox = data.viewBox;
     this.viewMode = data.viewMode || "radial";
-    this.svg.setAttribute("viewBox", `${data.viewBox.x} ${data.viewBox.y} ${data.viewBox.width} ${data.viewBox.height}`);
+    this.setViewBox(data.viewBox);
     this.svg.replaceChildren();
+    this.svg.classList.toggle("dense-map", data.nodes.length > config.layout.maxDetailedEdgeNodes);
 
     const defs = this.renderDefs();
     const guidesLayer = utils.svgEl("g", { class: "ring-guides", "aria-hidden": "true" });
@@ -25,12 +29,36 @@
     this.svg.append(defs, guidesLayer, edgesLayer, pathEdgesLayer, nodesLayer);
 
     (data.rings || []).forEach((ring) => this.renderRingGuide(guidesLayer, ring));
+    const detailedEdges = data.nodes.length <= config.layout.maxDetailedEdgeNodes;
     data.nodes.forEach(({ node }) => {
-      node.children.forEach((child) => this.renderEdge(edgesLayer, pathEdgesLayer, defs, data.tree, node, child, data.positions, data.focusContext));
+      node.children.forEach((child) => this.renderEdge(edgesLayer, pathEdgesLayer, defs, data.tree, node, child, data.positions, data.focusContext, detailedEdges));
     });
     data.nodes.forEach(({ node, parent }) => {
       this.renderNode(nodesLayer, data.tree, node, parent, data.positions.get(node.id), data.previousPositions && data.previousPositions.get(node.id), data.focusedId, data.animatedFocusId, data.animatedNewId, data.focusContext, data.mapRootIds, data.showStatusMarkers, data.showPriorityMarkers, data.viewMode, handlers);
     });
+  };
+
+  Renderer.prototype.bindEvents = function () {
+    this.svg.addEventListener("pointerdown", (event) => {
+      const item = eventNode(event, this.svg);
+      if (!item || !this.handlers || !this.handlers.nodePointerDown) return;
+      this.handlers.nodePointerDown(event, item.id);
+    });
+    this.svg.addEventListener("click", (event) => {
+      const item = eventNode(event, this.svg);
+      if (!item || !this.handlers || !this.handlers.focus) return;
+      this.handlers.focus(item.id, event);
+    });
+    this.svg.addEventListener("dblclick", (event) => {
+      const item = eventNode(event, this.svg);
+      if (!item || !this.handlers || !this.handlers.edit) return;
+      this.handlers.edit(item.id);
+    });
+  };
+
+  Renderer.prototype.setViewBox = function (viewBox) {
+    this.viewBox = viewBox;
+    this.svg.setAttribute("viewBox", `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`);
   };
 
   Renderer.prototype.renderDefs = function () {
@@ -101,32 +129,35 @@
     }));
   };
 
-  Renderer.prototype.renderEdge = function (layer, pathLayer, defs, tree, parent, child, positions, focusContext) {
+  Renderer.prototype.renderEdge = function (layer, pathLayer, defs, tree, parent, child, positions, focusContext, detailedEdges) {
     const from = positions.get(parent.id);
     const to = positions.get(child.id);
     if (!from || !to) return;
-    const gradientId = `grad-${parent.id}-${child.id}`;
-    const gradient = utils.svgEl("linearGradient", {
-      id: gradientId,
-      x1: from.x,
-      y1: from.y,
-      x2: to.x,
-      y2: to.y,
-      gradientUnits: "userSpaceOnUse"
-    });
-    gradient.append(
-      utils.svgEl("stop", { offset: "0%", "stop-color": renderColor(tree, parent) }),
-      utils.svgEl("stop", { offset: "100%", "stop-color": renderColor(tree, child) })
-    );
-    defs.append(gradient);
+    const gradientId = detailedEdges ? `grad-${parent.id}-${child.id}` : "";
+    if (detailedEdges) {
+      const gradient = utils.svgEl("linearGradient", {
+        id: gradientId,
+        x1: from.x,
+        y1: from.y,
+        x2: to.x,
+        y2: to.y,
+        gradientUnits: "userSpaceOnUse"
+      });
+      gradient.append(
+        utils.svgEl("stop", { offset: "0%", "stop-color": renderColor(tree, parent) }),
+        utils.svgEl("stop", { offset: "100%", "stop-color": renderColor(tree, child) })
+      );
+      defs.append(gradient);
+    }
     const isPathEdge = Boolean(focusContext && focusContext.pathChildIds && focusContext.pathChildIds.has(child.id));
     const targetLayer = isPathEdge ? pathLayer : layer;
     const edge = utils.svgEl("path", {
       class: `edge ${isPathEdge ? "path-edge" : ""}`,
       d: `M ${from.x} ${from.y} L ${to.x} ${to.y}`,
-      stroke: `url(#${gradientId})`
+      stroke: detailedEdges ? `url(#${gradientId})` : renderColor(tree, child)
     });
-    targetLayer.append(edge, this.renderPencilEdge(parent.id + "-" + child.id, from, to, isPathEdge));
+    targetLayer.append(edge);
+    if (detailedEdges) targetLayer.append(this.renderPencilEdge(parent.id + "-" + child.id, from, to, isPathEdge));
   };
 
   Renderer.prototype.renderPencilEdge = function (id, from, to, isPathEdge) {
@@ -163,10 +194,6 @@
     });
     if (node.id === animatedFocusId) group.classList.add("focus-pop");
     if (node.id === animatedNewId) group.classList.add("node-enter");
-
-    group.addEventListener("pointerdown", (event) => handlers.nodePointerDown(event, node.id));
-    group.addEventListener("click", (event) => handlers.focus(node.id, event));
-    group.addEventListener("dblclick", () => handlers.edit(node.id));
 
     if (previousPoint && Math.hypot(previousPoint.x - point.x, previousPoint.y - point.y) > 2) {
       const settle = utils.svgEl("animateTransform", {
@@ -322,9 +349,18 @@
     return node.depth === 0 ? "var(--root-node-fill)" : model.nodeColor(tree, node);
   }
 
+  function eventNode(event, svg) {
+    const target = event.target;
+    const group = target && target.closest ? target.closest(".node") : null;
+    if (!group || !svg.contains(group)) return null;
+    const id = group.getAttribute("data-node-id");
+    return id ? { id, group } : null;
+  }
+
   function viewRole(viewMode, depth) {
     const roles = {
-      book: ["cover", "chapter", "section", "note"]
+      book: ["cover", "chapter", "section", "note"],
+      document: ["doc-title", "section", "subsection", "subsubsection"]
     };
     return (roles[viewMode] && roles[viewMode][depth]) || "node";
   }
@@ -336,6 +372,12 @@
         1: { padX: 19, padY: 17, labelChars: 25, labelLines: 2, noteChars: 44, noteLines: Infinity, labelLineHeight: 22, noteLineHeight: 15, noteGap: 11 },
         2: { padX: 17, padY: 16, labelChars: 30, labelLines: 2, noteChars: 48, noteLines: Infinity, labelLineHeight: 20, noteLineHeight: 14, noteGap: 10 },
         3: { padX: 15, padY: 14, labelChars: 26, labelLines: 2, noteChars: 40, noteLines: Infinity, labelLineHeight: 18, noteLineHeight: 13, noteGap: 8 }
+      },
+      document: {
+        0: { padX: 32, padY: 28, labelChars: 40, labelLines: 2, noteChars: 86, noteLines: Infinity, labelLineHeight: 34, noteLineHeight: 17, noteGap: 16 },
+        1: { padX: 26, padY: 18, labelChars: 52, labelLines: 2, noteChars: 84, noteLines: Infinity, labelLineHeight: 25, noteLineHeight: 16, noteGap: 12 },
+        2: { padX: 24, padY: 15, labelChars: 56, labelLines: 2, noteChars: 80, noteLines: Infinity, labelLineHeight: 21, noteLineHeight: 15, noteGap: 10 },
+        3: { padX: 22, padY: 13, labelChars: 58, labelLines: 2, noteChars: 76, noteLines: Infinity, labelLineHeight: 18, noteLineHeight: 14, noteGap: 8 }
       }
     };
     return profiles[viewMode] && profiles[viewMode][depth];

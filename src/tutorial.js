@@ -1106,11 +1106,11 @@
       "focusedId": "root",
       "viewMode": "ring",
       "spacing": {
-        "treeLevelGap": 82,
-        "treeLeafGap": 110,
-        "ringBaseRadius": 110,
-        "ringDepthGap": 100,
-        "ringNodeGap": 28
+        "treeLevelGap": 72,
+        "treeLeafGap": 92,
+        "ringBaseRadius": 102,
+        "ringDepthGap": 90,
+        "ringNodeGap": 20
       }
     },
     {
@@ -1120,11 +1120,11 @@
       "focusedId": "node-14",
       "viewMode": "ring",
       "spacing": {
-        "treeLevelGap": 82,
-        "treeLeafGap": 110,
-        "ringBaseRadius": 110,
-        "ringDepthGap": 100,
-        "ringNodeGap": 28
+        "treeLevelGap": 72,
+        "treeLeafGap": 92,
+        "ringBaseRadius": 102,
+        "ringDepthGap": 90,
+        "ringNodeGap": 20
       }
     },
     {
@@ -1134,11 +1134,11 @@
       "focusedId": "root",
       "viewMode": "ring",
       "spacing": {
-        "treeLevelGap": 82,
-        "treeLeafGap": 110,
-        "ringBaseRadius": 110,
-        "ringDepthGap": 100,
-        "ringNodeGap": 28
+        "treeLevelGap": 72,
+        "treeLeafGap": 92,
+        "ringBaseRadius": 102,
+        "ringDepthGap": 90,
+        "ringNodeGap": 20
       }
     },
     {
@@ -1148,11 +1148,11 @@
       "focusedId": "node-85",
       "viewMode": "ring",
       "spacing": {
-        "treeLevelGap": 82,
-        "treeLeafGap": 110,
-        "ringBaseRadius": 110,
-        "ringDepthGap": 100,
-        "ringNodeGap": 28
+        "treeLevelGap": 72,
+        "treeLeafGap": 92,
+        "ringBaseRadius": 102,
+        "ringDepthGap": 90,
+        "ringNodeGap": 20
       }
     },
     {
@@ -1162,11 +1162,11 @@
       "focusedId": "root",
       "viewMode": "ring",
       "spacing": {
-        "treeLevelGap": 82,
-        "treeLeafGap": 110,
-        "ringBaseRadius": 110,
-        "ringDepthGap": 100,
-        "ringNodeGap": 28
+        "treeLevelGap": 72,
+        "treeLeafGap": 92,
+        "ringBaseRadius": 102,
+        "ringDepthGap": 90,
+        "ringNodeGap": 20
       }
     },
     {
@@ -1176,11 +1176,11 @@
       "focusedId": "node-92",
       "viewMode": "ring",
       "spacing": {
-        "treeLevelGap": 82,
-        "treeLeafGap": 110,
-        "ringBaseRadius": 110,
-        "ringDepthGap": 100,
-        "ringNodeGap": 28
+        "treeLevelGap": 72,
+        "treeLeafGap": 92,
+        "ringBaseRadius": 102,
+        "ringDepthGap": 90,
+        "ringNodeGap": 20
       }
     },
     {
@@ -1190,11 +1190,11 @@
       "focusedId": "root",
       "viewMode": "ring",
       "spacing": {
-        "treeLevelGap": 82,
-        "treeLeafGap": 110,
-        "ringBaseRadius": 110,
-        "ringDepthGap": 100,
-        "ringNodeGap": 28
+        "treeLevelGap": 72,
+        "treeLeafGap": 92,
+        "ringBaseRadius": 102,
+        "ringDepthGap": 90,
+        "ringNodeGap": 20
       }
     },
     {
@@ -1204,11 +1204,11 @@
       "focusedId": "node-95",
       "viewMode": "ring",
       "spacing": {
-        "treeLevelGap": 82,
-        "treeLeafGap": 110,
-        "ringBaseRadius": 110,
-        "ringDepthGap": 100,
-        "ringNodeGap": 28
+        "treeLevelGap": 72,
+        "treeLeafGap": 92,
+        "ringBaseRadius": 102,
+        "ringDepthGap": 90,
+        "ringNodeGap": 20
       }
     },
     {
@@ -1218,11 +1218,11 @@
       "focusedId": "node-98",
       "viewMode": "ring",
       "spacing": {
-        "treeLevelGap": 82,
-        "treeLeafGap": 110,
-        "ringBaseRadius": 110,
-        "ringDepthGap": 100,
-        "ringNodeGap": 28
+        "treeLevelGap": 72,
+        "treeLeafGap": 92,
+        "ringBaseRadius": 102,
+        "ringDepthGap": 90,
+        "ringNodeGap": 20
       }
     },
     {
@@ -1232,11 +1232,11 @@
       "focusedId": "node-100",
       "viewMode": "ring",
       "spacing": {
-        "treeLevelGap": 82,
-        "treeLeafGap": 110,
-        "ringBaseRadius": 110,
-        "ringDepthGap": 100,
-        "ringNodeGap": 28
+        "treeLevelGap": 72,
+        "treeLeafGap": 92,
+        "ringBaseRadius": 102,
+        "ringDepthGap": 90,
+        "ringNodeGap": 20
       }
     },
     {
@@ -1246,11 +1246,11 @@
       "focusedId": "root",
       "viewMode": "ring",
       "spacing": {
-        "treeLevelGap": 82,
-        "treeLeafGap": 110,
-        "ringBaseRadius": 110,
-        "ringDepthGap": 100,
-        "ringNodeGap": 28
+        "treeLevelGap": 72,
+        "treeLeafGap": 92,
+        "ringBaseRadius": 102,
+        "ringDepthGap": 90,
+        "ringNodeGap": 20
       }
     },
     {
@@ -1260,11 +1260,11 @@
       "focusedId": "root",
       "viewMode": "ring",
       "spacing": {
-        "treeLevelGap": 82,
-        "treeLeafGap": 110,
-        "ringBaseRadius": 110,
-        "ringDepthGap": 100,
-        "ringNodeGap": 28
+        "treeLevelGap": 72,
+        "treeLeafGap": 92,
+        "ringBaseRadius": 102,
+        "ringDepthGap": 90,
+        "ringNodeGap": 20
       }
     }
   ],
@@ -1276,7 +1276,7 @@
     "showStatusMarkers": false,
     "showPriorityMarkers": true
   },
-  "theme": "graphite",
+  "theme": "dark",
   "customTheme": {
     "bg": "#f3f4f6",
     "surface-solid": "#ffffff",

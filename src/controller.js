@@ -5,10 +5,13 @@
   const { config, model, storage, utils } = RingMapChart;
   const WELCOME_KEY = "ring-map-chart-welcome-v1";
   const GITHUB_SYNC_KEY = "concen-github-sync-v1";
+  const UNDO_MAX_ITEMS = 40;
+  const UNDO_MAX_BYTES = 2500000;
+  const RECENT_MAX_ITEMS = 6;
   const DEFAULT_BRANCH_COLORS = config.colors.slice();
   const LAYOUT_PRESETS = {
-    compact: { treeLevelGap: 64, treeLeafGap: 84, ringBaseRadius: 88, ringDepthGap: 76, ringNodeGap: 12 },
-    balanced: { treeLevelGap: 82, treeLeafGap: 110, ringBaseRadius: 110, ringDepthGap: 100, ringNodeGap: 28 },
+    compact: { treeLevelGap: 48, treeLeafGap: 56, ringBaseRadius: 68, ringDepthGap: 58, ringNodeGap: 4 },
+    balanced: { treeLevelGap: 72, treeLeafGap: 92, ringBaseRadius: 102, ringDepthGap: 90, ringNodeGap: 20 },
     wide: { treeLevelGap: 118, treeLeafGap: 160, ringBaseRadius: 155, ringDepthGap: 145, ringNodeGap: 58 }
   };
   const THEME_COLOR_TOKEN_KEYS = [
@@ -113,6 +116,7 @@
     this.editingId = null;
     this.animatedNewNodeId = null;
     this.noteCloseTimer = null;
+    this.noteSaveTimer = null;
     this.isSpaceDown = false;
     this.isPointerOverCanvas = false;
     this.isPanning = false;
@@ -124,6 +128,9 @@
     this.actionBarOpen = false;
     this.undoStack = [];
     this.redoStack = [];
+    this.undoBytes = 0;
+    this.redoBytes = 0;
+    this.mindIndex = null;
     this.paletteItems = [];
     this.paletteIndex = 0;
     this.nodeLinkItems = [];
@@ -132,6 +139,8 @@
     this.saveStateTimer = null;
     this.recentMinds = [];
     this.githubSync = loadGithubSyncConfig();
+    this.activeCustomSelect = null;
+    this.layoutSettingsOpen = false;
     this.ctrlHoldTimer = null;
     this.ctrlOnlyDown = false;
   }
@@ -225,6 +234,14 @@
       if (button) this.applyModePack(button.dataset.modePack);
     });
     this.el.exportMindButton.addEventListener("click", () => this.exportMind());
+    if (this.el.recoveryButton) this.el.recoveryButton.addEventListener("click", () => this.openRecovery());
+    if (this.el.recoveryCloseButton) this.el.recoveryCloseButton.addEventListener("click", () => this.closeRecovery());
+    if (this.el.recoveryDialog) this.el.recoveryDialog.addEventListener("pointerdown", (event) => {
+      if (event.target === this.el.recoveryDialog) this.closeRecovery();
+    });
+    if (this.el.recoveryExportCurrentButton) this.el.recoveryExportCurrentButton.addEventListener("click", () => this.exportCurrentRecoveryBackup());
+    if (this.el.recoverySavePointButton) this.el.recoverySavePointButton.addEventListener("click", () => this.saveRecoveryPoint());
+    if (this.el.recoveryClearButton) this.el.recoveryClearButton.addEventListener("click", () => this.clearRecentMinds("recovery"));
     this.el.importMindInput.addEventListener("change", () => this.importMind());
     if (this.el.githubSaveSettingsButton) this.el.githubSaveSettingsButton.addEventListener("click", () => this.saveGithubSyncSettings());
     if (this.el.githubExportSettingsButton) this.el.githubExportSettingsButton.addEventListener("click", () => this.exportGithubSyncSettings());
@@ -232,7 +249,7 @@
     if (this.el.githubPushButton) this.el.githubPushButton.addEventListener("click", () => this.pushMindToGithub());
     if (this.el.githubPullButton) this.el.githubPullButton.addEventListener("click", () => this.pullMindFromGithub());
     if (this.el.githubDisconnectButton) this.el.githubDisconnectButton.addEventListener("click", () => this.disconnectGithubSync());
-    if (this.el.clearRecentMindsButton) this.el.clearRecentMindsButton.addEventListener("click", () => this.clearRecentMinds());
+    if (this.el.clearRecentMindsButton) this.el.clearRecentMindsButton.addEventListener("click", () => this.clearRecentMinds("recent"));
     [this.el.mindMenu, this.el.settingsMenu].forEach((menu) => {
       if (!menu) return;
       menu.addEventListener("toggle", () => {
@@ -249,6 +266,12 @@
     if (this.el.treeViewButton) this.el.treeViewButton.addEventListener("click", () => this.setViewMode("tree"));
     if (this.el.radialViewButton) this.el.radialViewButton.addEventListener("click", () => this.setViewMode("radial"));
     if (this.el.bookViewButton) this.el.bookViewButton.addEventListener("click", () => this.setViewMode("book"));
+    if (this.el.documentViewButton) this.el.documentViewButton.addEventListener("click", () => this.setViewMode("document"));
+    if (this.el.layoutSettingsButton) this.el.layoutSettingsButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.toggleLayoutSettings();
+    });
     if (this.el.zoomOutButton) this.el.zoomOutButton.addEventListener("click", () => this.zoomBy(0.85));
     if (this.el.zoomInButton) this.el.zoomInButton.addEventListener("click", () => this.zoomBy(1.18));
     if (this.el.fitViewButton) this.el.fitViewButton.addEventListener("click", () => this.fitCurrentView());
@@ -261,6 +284,16 @@
         this.updateStatus("Style changed");
       });
     }
+    if (this.el.backgroundEffectInput) {
+      this.el.backgroundEffectInput.addEventListener("change", () => {
+        this.appearance.backgroundEffect = storage.normalizeBackgroundEffect(this.el.backgroundEffectInput.value);
+        this.applyAppearance();
+        this.syncStyleControls();
+        this.save();
+        this.updateStatus("Background changed");
+      });
+    }
+    if (this.el.backgroundImageInput) this.el.backgroundImageInput.addEventListener("change", () => this.importBackgroundImage());
     if (this.el.navigationModeInput) {
       this.el.navigationModeInput.addEventListener("change", () => {
         this.appearance.navigationMode = storage.normalizeNavigationMode(this.el.navigationModeInput.value);
@@ -269,21 +302,25 @@
       });
     }
     Object.entries(this.el.appearanceInputs).forEach(([key, input]) => {
-      const applyAppearanceValue = () => {
+      const applyAppearanceValue = (persist) => {
         const limits = config.appearanceLimits[key];
         this.appearance[key] = utils.clampNumber(input.value, limits.min, limits.max, this.appearance[key]);
         this.syncAppearanceInputs(true);
         this.applyAppearance();
-        this.save();
+        if (persist !== false) this.save();
         this.shouldRevealFocus = true;
-        this.render();
+        this.scheduleRender(true);
       };
-      input.addEventListener("change", applyAppearanceValue);
+      input.addEventListener("change", () => applyAppearanceValue(true));
       const range = this.el.appearanceRanges && this.el.appearanceRanges[key];
       if (range) {
         range.addEventListener("input", () => {
           input.value = range.value;
-          applyAppearanceValue();
+          applyAppearanceValue(false);
+        });
+        range.addEventListener("change", () => {
+          input.value = range.value;
+          applyAppearanceValue(true);
         });
       }
       input.addEventListener("keydown", (event) => {
@@ -317,20 +354,24 @@
     this.el.importThemeInput.addEventListener("change", () => this.importTheme());
 
     Object.entries(this.el.spacingInputs).forEach(([key, input]) => {
-      const applySpacingValue = () => {
+      const applySpacingValue = (persist) => {
         const limits = config.spacingLimits[key];
         this.spacing[key] = utils.clampNumber(input.value, limits.min, limits.max, this.spacing[key]);
         this.syncSpacingInputs(true);
-        this.save();
+        if (persist !== false) this.save();
         this.shouldRevealFocus = true;
-        this.render();
+        this.scheduleRender(true);
       };
-      input.addEventListener("change", applySpacingValue);
+      input.addEventListener("change", () => applySpacingValue(true));
       const range = this.el.spacingRanges && this.el.spacingRanges[key];
       if (range) {
         range.addEventListener("input", () => {
           input.value = range.value;
-          applySpacingValue();
+          applySpacingValue(false);
+        });
+        range.addEventListener("change", () => {
+          input.value = range.value;
+          applySpacingValue(true);
         });
       }
       input.addEventListener("keydown", (event) => {
@@ -359,8 +400,7 @@
       }
     });
     this.el.noteInput.addEventListener("input", () => {
-      this.saveFocusedNote();
-      this.renderNodeLinkSuggest();
+      this.scheduleFocusedNoteSave();
     });
     this.el.nodeStatusInput.addEventListener("change", () => this.saveFocusedNote());
     this.el.nodePriorityInput.addEventListener("change", () => this.saveFocusedNote());
@@ -480,11 +520,14 @@
 
   Controller.prototype.handleDocumentPointerDown = function (event) {
     this.cancelShortcutHold();
+    if (this.activeCustomSelect && !this.activeCustomSelect.root.contains(event.target)) this.closeCustomSelect();
+    if (this.layoutSettingsOpen && this.el.layoutSettingsDropdown && !this.el.layoutSettingsDropdown.contains(event.target)) this.closeLayoutSettings();
     if (!this.actionBarOpen) return;
     const target = event.target;
     if (this.el.nodeActionBar && this.el.nodeActionBar.contains(target)) return;
     if (this.el.nodeEditor && this.el.nodeEditor.contains(target)) return;
     if (target.closest && target.closest(".node")) return;
+    if (isCanvasPointerTarget(target, this.el.svg)) return;
     this.actionBarOpen = false;
     this.positionActionBar();
   };
@@ -500,13 +543,28 @@
     this.camera.x += delta.x / this.camera.scale;
     this.camera.y += delta.y / this.camera.scale;
     this.clampCamera();
-    this.scheduleRender(false);
+    this.updateCameraView();
   };
 
   Controller.prototype.handleGlobalKeyDown = function (event) {
     if (event.defaultPrevented) return;
     this.trackShortcutHold(event);
     const editableTarget = utils.isEditableTarget(document.activeElement);
+    if (event.key === "Escape" && this.el.recoveryDialog && !this.el.recoveryDialog.hidden) {
+      event.preventDefault();
+      this.closeRecovery();
+      return;
+    }
+    if (event.key === "Escape" && this.activeCustomSelect) {
+      event.preventDefault();
+      this.closeCustomSelect();
+      return;
+    }
+    if (event.key === "Escape" && this.layoutSettingsOpen) {
+      event.preventDefault();
+      this.closeLayoutSettings();
+      return;
+    }
     if (event.key === "Escape" && this.el.shortcutSheet && !this.el.shortcutSheet.hidden) {
       event.preventDefault();
       this.closeShortcutSheet();
@@ -524,6 +582,7 @@
     }
     if ((event.key === "k" || event.key === "K") && (event.ctrlKey || event.metaKey) && !editableTarget) {
       event.preventDefault();
+      if (this.isModalOpen()) return;
       this.openCommandPalette();
       return;
     }
@@ -574,9 +633,7 @@
   Controller.prototype.trackShortcutHold = function (event) {
     if (event.key === "Control" && !event.repeat && !event.altKey && !event.metaKey && !event.shiftKey) {
       if (utils.isEditableTarget(document.activeElement)) return;
-      if (this.el.commandPalette && !this.el.commandPalette.hidden) return;
-      if (this.el.welcomeDialog && !this.el.welcomeDialog.hidden) return;
-      if (this.el.shortcutSheet && !this.el.shortcutSheet.hidden) return;
+      if (this.isModalOpen()) return;
       this.cancelShortcutHold();
       this.ctrlOnlyDown = true;
       this.ctrlHoldTimer = setTimeout(() => {
@@ -594,6 +651,15 @@
       clearTimeout(this.ctrlHoldTimer);
       this.ctrlHoldTimer = null;
     }
+  };
+
+  Controller.prototype.isModalOpen = function () {
+    return Boolean(
+      (this.el.commandPalette && !this.el.commandPalette.hidden) ||
+      (this.el.welcomeDialog && !this.el.welcomeDialog.hidden) ||
+      (this.el.shortcutSheet && !this.el.shortcutSheet.hidden) ||
+      (this.el.recoveryDialog && !this.el.recoveryDialog.hidden)
+    );
   };
 
   Controller.prototype.addNode = function (editAfterAdd) {
@@ -719,6 +785,7 @@
   Controller.prototype.refreshViewTree = function (focusedId) {
     const map = this.currentMap();
     if (!map || !this.mind.nodes[map.rootNodeId]) return;
+    this.invalidateMindIndex();
     this.store.tree = model.viewTree(this.mind, map.rootNodeId);
     const nextFocus = focusedId || map.focusedId || model.ROOT_ID;
     this.store.focusedId = model.findNode(this.store.tree, nextFocus) ? nextFocus : model.ROOT_ID;
@@ -1059,7 +1126,7 @@
     }
     if (action.kind !== "node") return;
     const target = String(action.target || "").trim();
-    const node = linkedNode(target, this.mind);
+    const node = linkedNode(target, this.mind, this.getMindIndex());
     if (!node) {
       this.updateStatus("Linked node not found");
       return;
@@ -1105,6 +1172,7 @@
       this.el.mapSelect.append(option);
     });
     this.el.mapSelect.value = this.activeMapId;
+    this.renderCustomSelect(this.el.mapSelect, this.el.mapSelectDropdown);
     this.el.deleteMapButton.disabled = this.maps.length <= 1;
   };
 
@@ -1177,6 +1245,54 @@
     if (this.el.treeViewButton) this.el.treeViewButton.setAttribute("aria-pressed", String(isTree));
     if (this.el.radialViewButton) this.el.radialViewButton.setAttribute("aria-pressed", String(isRadial));
     if (this.el.bookViewButton) this.el.bookViewButton.setAttribute("aria-pressed", String(mode === "book"));
+    if (this.el.documentViewButton) this.el.documentViewButton.setAttribute("aria-pressed", String(mode === "document"));
+    this.syncLayoutSettingsControls();
+  };
+
+  Controller.prototype.syncLayoutSettingsControls = function () {
+    const mode = normalizeViewMode(this.viewMode);
+    const modeConfig = config.layoutModeControls[mode] || config.layoutModeControls.radial;
+    const labels = modeConfig.controls || {};
+    const visibleKeys = new Set(Object.keys(labels));
+    if (this.el.layoutSettingsButton) this.el.layoutSettingsButton.textContent = `${modeConfig.label} tuning`;
+    if (this.el.layoutSettingsSummary) this.el.layoutSettingsSummary.textContent = `${modeConfig.label} settings`;
+    Object.entries(this.el.spacingInputs).forEach(([key, input]) => {
+      const field = input.closest(".range-field");
+      if (!field) return;
+      const show = visibleKeys.has(key);
+      field.hidden = !show;
+      const label = labels[key];
+      const labelEl = field.querySelector("span");
+      if (show && label && labelEl) {
+        labelEl.textContent = label;
+        const range = this.el.spacingRanges && this.el.spacingRanges[key];
+        if (range) range.setAttribute("aria-label", label);
+        input.setAttribute("aria-label", `${label} value`);
+      }
+    });
+  };
+
+  Controller.prototype.toggleLayoutSettings = function () {
+    if (this.layoutSettingsOpen) this.closeLayoutSettings();
+    else this.openLayoutSettings();
+  };
+
+  Controller.prototype.openLayoutSettings = function () {
+    if (!this.el.layoutSettingsButton || !this.el.layoutSettingsPanel) return;
+    this.closeCustomSelect();
+    this.syncLayoutSettingsControls();
+    this.layoutSettingsOpen = true;
+    this.el.layoutSettingsDropdown.classList.add("is-open");
+    this.el.layoutSettingsButton.setAttribute("aria-expanded", "true");
+    this.el.layoutSettingsPanel.hidden = false;
+  };
+
+  Controller.prototype.closeLayoutSettings = function () {
+    if (!this.el.layoutSettingsButton || !this.el.layoutSettingsPanel) return;
+    this.layoutSettingsOpen = false;
+    if (this.el.layoutSettingsDropdown) this.el.layoutSettingsDropdown.classList.remove("is-open");
+    this.el.layoutSettingsButton.setAttribute("aria-expanded", "false");
+    this.el.layoutSettingsPanel.hidden = true;
   };
 
   Controller.prototype.updatePathTrail = function () {
@@ -1200,6 +1316,10 @@
   };
 
   Controller.prototype.save = function () {
+    if (this.noteSaveTimer) {
+      this.saveFocusedNote();
+      return;
+    }
     this.captureActiveMap();
     const saved = storage.save({
       mind: this.mind,
@@ -1232,6 +1352,9 @@
     document.documentElement.style.setProperty("--node-font-size", this.appearance.nodeFontSize + "px");
     document.documentElement.style.setProperty("--leaf-marker-font-size", Math.max(7, Math.round(this.appearance.nodeFontSize * 0.69)) + "px");
     document.documentElement.dataset.style = storage.normalizeStylePreset(this.appearance.stylePreset);
+    document.documentElement.dataset.background = storage.normalizeBackgroundEffect(this.appearance.backgroundEffect);
+    const imageData = storage.normalizeBackgroundImageData(this.appearance.backgroundImageData);
+    document.documentElement.style.setProperty("--background-image-url", imageData ? `url("${imageData}")` : "none");
     document.documentElement.dataset.view = normalizeViewMode(this.viewMode);
     this.applyStyleOverrides();
   };
@@ -1257,38 +1380,195 @@
 
   Controller.prototype.syncStyleControls = function () {
     if (this.el.stylePresetInput && !this.el.stylePresetInput.options.length) {
-      Object.entries(config.stylePresets).forEach(([key, preset]) => {
-        const option = document.createElement("option");
-        option.value = key;
-        option.textContent = preset.label;
-        this.el.stylePresetInput.append(option);
-      });
+      populateSelectOptions(this.el.stylePresetInput, config.stylePresets, config.styleGroups);
+    }
+    if (this.el.backgroundEffectInput && !this.el.backgroundEffectInput.options.length) {
+      populateSelectOptions(this.el.backgroundEffectInput, config.backgroundEffects);
     }
     if (this.el.navigationModeInput && !this.el.navigationModeInput.options.length) {
-      Object.entries(config.navigationModes).forEach(([key, preset]) => {
-        const option = document.createElement("option");
-        option.value = key;
-        option.textContent = preset.label;
-        this.el.navigationModeInput.append(option);
-      });
+      populateSelectOptions(this.el.navigationModeInput, config.navigationModes);
     }
     if (this.el.stylePresetInput) this.el.stylePresetInput.value = storage.normalizeStylePreset(this.appearance.stylePreset);
+    if (this.el.backgroundEffectInput) this.el.backgroundEffectInput.value = storage.normalizeBackgroundEffect(this.appearance.backgroundEffect);
     if (this.el.navigationModeInput) this.el.navigationModeInput.value = storage.normalizeNavigationMode(this.appearance.navigationMode);
+    this.renderCustomSelect(this.el.stylePresetInput, this.el.stylePresetDropdown);
+    this.renderCustomSelect(this.el.backgroundEffectInput, this.el.backgroundEffectDropdown);
+    this.renderCustomSelect(this.el.navigationModeInput, this.el.navigationModeDropdown);
+    if (this.el.backgroundImageUpload) this.el.backgroundImageUpload.hidden = storage.normalizeBackgroundEffect(this.appearance.backgroundEffect) !== "image";
+  };
+
+  Controller.prototype.importBackgroundImage = function () {
+    const file = this.el.backgroundImageInput && this.el.backgroundImageInput.files && this.el.backgroundImageInput.files[0];
+    if (!file) return;
+    if (!file.type || !file.type.startsWith("image/")) {
+      this.updateStatus("Background image must be an image file");
+      this.el.backgroundImageInput.value = "";
+      return;
+    }
+    const maxBytes = Math.floor((config.backgroundImageMaxDataUrlLength || 1500000) * 0.72);
+    if (file.size > maxBytes) {
+      this.updateStatus("Background image too large");
+      this.el.backgroundImageInput.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const data = storage.normalizeBackgroundImageData(reader.result);
+      if (!data) {
+        this.updateStatus("Background image could not be loaded");
+        return;
+      }
+      this.appearance.backgroundEffect = "image";
+      this.appearance.backgroundImageData = data;
+      this.applyAppearance();
+      this.syncStyleControls();
+      this.save();
+      this.updateStatus("Background image added");
+      this.el.backgroundImageInput.value = "";
+    };
+    reader.onerror = () => {
+      this.updateStatus("Background image could not be loaded");
+      this.el.backgroundImageInput.value = "";
+    };
+    reader.readAsDataURL(file);
   };
 
   Controller.prototype.syncThemeControls = function () {
     if (!this.el.themePresetInput) return;
     if (!this.el.themePresetInput.options.length) {
-      Object.entries(config.themePresets).forEach(([key, preset]) => {
-        const option = document.createElement("option");
-        option.value = key;
-        option.textContent = preset.label;
-        this.el.themePresetInput.append(option);
-      });
+      populateSelectOptions(this.el.themePresetInput, config.themePresets, config.themeGroups);
     }
     this.el.themePresetInput.value = config.themePresets[this.theme] ? this.theme : "light";
+    this.renderCustomSelect(this.el.themePresetInput, this.el.themePresetDropdown);
     if (this.el.customThemeEditor) this.el.customThemeEditor.hidden = this.theme !== "custom";
     if (!this.el.customThemeEditor || !this.el.customThemeEditor.contains(document.activeElement)) this.renderCustomThemeEditor();
+  };
+
+  Controller.prototype.renderCustomSelect = function (select, root) {
+    if (!select || !root) return;
+    select.classList.add("native-select-hidden");
+    root.classList.add("custom-select-ready");
+    root.replaceChildren();
+    const selected = select.selectedOptions && select.selectedOptions[0];
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "custom-select-button";
+    button.setAttribute("aria-haspopup", "listbox");
+    button.setAttribute("aria-expanded", "false");
+    button.textContent = selected ? selected.textContent : "";
+    const list = document.createElement("div");
+    list.className = "custom-select-list";
+    list.setAttribute("role", "listbox");
+    list.hidden = true;
+    Array.from(select.children).forEach((child) => {
+      if (child.tagName === "OPTGROUP") {
+        const group = document.createElement("div");
+        group.className = "custom-select-group";
+        group.textContent = child.label;
+        list.append(group);
+        Array.from(child.children).forEach((option) => {
+          list.append(this.customSelectOption(select, root, option));
+        });
+        return;
+      }
+      if (child.tagName === "OPTION") list.append(this.customSelectOption(select, root, child));
+    });
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.toggleCustomSelect(root);
+    });
+    button.addEventListener("keydown", (event) => this.handleCustomSelectButtonKey(event, root));
+    root.append(button, list);
+    if (this.activeCustomSelect && this.activeCustomSelect.root === root) this.activeCustomSelect = null;
+  };
+
+  Controller.prototype.customSelectOption = function (select, root, option) {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "custom-select-option";
+    item.dataset.value = option.value;
+    item.setAttribute("role", "option");
+    item.setAttribute("aria-selected", option.selected ? "true" : "false");
+    item.textContent = option.textContent;
+    item.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      select.value = option.value;
+      const button = root.querySelector(".custom-select-button");
+      if (button) button.textContent = option.textContent;
+      root.querySelectorAll(".custom-select-option").forEach((candidate) => {
+        candidate.setAttribute("aria-selected", candidate === item ? "true" : "false");
+      });
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      this.closeCustomSelect();
+    });
+    item.addEventListener("keydown", (event) => this.handleCustomSelectOptionKey(event));
+    return item;
+  };
+
+  Controller.prototype.toggleCustomSelect = function (root) {
+    if (this.activeCustomSelect && this.activeCustomSelect.root === root) {
+      this.closeCustomSelect();
+      return;
+    }
+    this.openCustomSelect(root);
+  };
+
+  Controller.prototype.openCustomSelect = function (root) {
+    if (!root) return;
+    this.closeCustomSelect();
+    const button = root.querySelector(".custom-select-button");
+    const list = root.querySelector(".custom-select-list");
+    if (!button || !list) return;
+    root.classList.add("is-open");
+    button.setAttribute("aria-expanded", "true");
+    list.hidden = false;
+    this.activeCustomSelect = { root, button, list };
+    const selected = list.querySelector('[aria-selected="true"]') || list.querySelector(".custom-select-option");
+    if (selected) selected.focus();
+  };
+
+  Controller.prototype.closeCustomSelect = function () {
+    if (!this.activeCustomSelect) return;
+    const { root, button, list } = this.activeCustomSelect;
+    root.classList.remove("is-open");
+    if (button) button.setAttribute("aria-expanded", "false");
+    if (list) list.hidden = true;
+    this.activeCustomSelect = null;
+  };
+
+  Controller.prototype.handleCustomSelectButtonKey = function (event, root) {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    this.openCustomSelect(root);
+  };
+
+  Controller.prototype.handleCustomSelectOptionKey = function (event) {
+    if (!this.activeCustomSelect) return;
+    const options = Array.from(this.activeCustomSelect.list.querySelectorAll(".custom-select-option"));
+    const index = options.indexOf(event.currentTarget);
+    if (event.key === "Escape") {
+      event.preventDefault();
+      const button = this.activeCustomSelect.button;
+      this.closeCustomSelect();
+      if (button) button.focus();
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      event.currentTarget.click();
+      return;
+    }
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Home" && event.key !== "End") return;
+    event.preventDefault();
+    if (!options.length) return;
+    let nextIndex = index;
+    if (event.key === "ArrowDown") nextIndex = Math.min(options.length - 1, index + 1);
+    if (event.key === "ArrowUp") nextIndex = Math.max(0, index - 1);
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = options.length - 1;
+    options[nextIndex].focus();
   };
 
   Controller.prototype.renderCustomThemeEditor = function () {
@@ -1400,6 +1680,8 @@
     this.el.noteSidebarTitle.textContent = node.label;
     if (this.el.nodeStatusInput) this.el.nodeStatusInput.value = node.status || "open";
     if (this.el.nodePriorityInput) this.el.nodePriorityInput.value = node.priority || "normal";
+    this.renderCustomSelect(this.el.nodeStatusInput, this.el.nodeStatusDropdown);
+    this.renderCustomSelect(this.el.nodePriorityInput, this.el.nodePriorityDropdown);
     if (this.el.nodeMarkerInput) this.el.nodeMarkerInput.checked = node.markerEnabled === true;
     if (this.el.nodeTagsInput && document.activeElement !== this.el.nodeTagsInput) {
       this.el.nodeTagsInput.value = Array.isArray(node.tags) ? node.tags.join(", ") : "";
@@ -1412,6 +1694,8 @@
 
   Controller.prototype.saveFocusedNote = function () {
     if (!this.el.noteInput || this.el.noteSidebar.hidden) return;
+    clearTimeout(this.noteSaveTimer);
+    this.noteSaveTimer = null;
     const sourceId = this.focusedSourceId();
     if (!sourceId) return;
     model.updateMindNodeNote(this.mind, sourceId, this.el.noteInput.value);
@@ -1428,6 +1712,12 @@
     this.scheduleRender(false);
   };
 
+  Controller.prototype.scheduleFocusedNoteSave = function () {
+    this.renderNodeLinkSuggest();
+    clearTimeout(this.noteSaveTimer);
+    this.noteSaveTimer = setTimeout(() => this.saveFocusedNote(), 180);
+  };
+
   Controller.prototype.focusNoteSourceNode = function () {
     if (!this.currentMindNode()) return;
     this.closeNoteSidebar(false);
@@ -1440,7 +1730,7 @@
   Controller.prototype.renderNoteLinks = function (note) {
     if (!this.el.noteLinks) return;
     this.el.noteLinks.replaceChildren();
-    const items = noteLinkItems(note, this.mind);
+    const items = noteLinkItems(note, this.mind, this.getMindIndex());
     this.el.noteLinks.hidden = !items.length;
     items.forEach((item) => {
       if (item.kind === "url") {
@@ -1472,7 +1762,7 @@
       this.el.backlinks.hidden = true;
       return;
     }
-    const items = backlinkItems(this.mind, node).slice(0, 8);
+    const items = backlinkItems(this.getMindIndex(), node).slice(0, 8);
     this.el.backlinks.hidden = !items.length;
     if (!items.length) return;
     const heading = document.createElement("span");
@@ -1502,14 +1792,15 @@
       return;
     }
     const query = range.query.toLowerCase();
-    this.nodeLinkItems = Object.values(this.mind.nodes)
-      .filter((node) => node.label && node.label.toLowerCase().includes(query))
+    this.nodeLinkItems = this.getMindIndex().nodes
+      .filter((item) => item.labelKey.includes(query))
       .sort((a, b) => {
-        const aStarts = a.label.toLowerCase().startsWith(query) ? 0 : 1;
-        const bStarts = b.label.toLowerCase().startsWith(query) ? 0 : 1;
-        return aStarts - bStarts || a.label.localeCompare(b.label);
+        const aStarts = a.labelKey.startsWith(query) ? 0 : 1;
+        const bStarts = b.labelKey.startsWith(query) ? 0 : 1;
+        return aStarts - bStarts || a.node.label.localeCompare(b.node.label);
       })
-      .slice(0, 8);
+      .slice(0, 8)
+      .map((item) => item.node);
     this.nodeLinkRange = range;
     this.nodeLinkIndex = Math.min(this.nodeLinkIndex, Math.max(0, this.nodeLinkItems.length - 1));
     this.el.nodeLinkSuggest.replaceChildren();
@@ -1603,6 +1894,15 @@
     return sourceId ? this.mind.nodes[sourceId] : null;
   };
 
+  Controller.prototype.invalidateMindIndex = function () {
+    this.mindIndex = null;
+  };
+
+  Controller.prototype.getMindIndex = function () {
+    if (!this.mindIndex) this.mindIndex = buildMindIndex(this.mind);
+    return this.mindIndex;
+  };
+
   Controller.prototype.openPathSource = function (sourceId) {
     const existing = this.maps.find((map) => map.rootNodeId === sourceId);
     const map = existing || this.ensureMapForNode(sourceId);
@@ -1612,9 +1912,9 @@
 
   Controller.prototype.pushUndoSnapshot = function () {
     this.captureActiveMap();
-    this.undoStack.push(this.snapshot());
-    if (this.undoStack.length > 80) this.undoStack.shift();
+    this.undoBytes = pushBoundedSnapshot(this.undoStack, this.undoBytes, this.snapshot());
     this.redoStack = [];
+    this.redoBytes = 0;
   };
 
   Controller.prototype.snapshot = function () {
@@ -1656,8 +1956,10 @@
       return;
     }
     this.captureActiveMap();
-    this.redoStack.push(this.snapshot());
-    this.restoreSnapshot(this.undoStack.pop());
+    this.redoBytes = pushBoundedSnapshot(this.redoStack, this.redoBytes, this.snapshot());
+    const raw = this.undoStack.pop();
+    this.undoBytes = Math.max(0, this.undoBytes - raw.length);
+    this.restoreSnapshot(raw);
     this.updateStatus("Undone");
   };
 
@@ -1667,8 +1969,10 @@
       return;
     }
     this.captureActiveMap();
-    this.undoStack.push(this.snapshot());
-    this.restoreSnapshot(this.redoStack.pop());
+    this.undoBytes = pushBoundedSnapshot(this.undoStack, this.undoBytes, this.snapshot());
+    const raw = this.redoStack.pop();
+    this.redoBytes = Math.max(0, this.redoBytes - raw.length);
+    this.restoreSnapshot(raw);
     this.updateStatus("Redone");
   };
 
@@ -1718,6 +2022,7 @@
     if (!this.el.welcomeDialog) return;
     if (this.el.shortcutSheet) this.el.shortcutSheet.hidden = true;
     if (this.el.commandPalette) this.el.commandPalette.hidden = true;
+    if (this.el.recoveryDialog) this.el.recoveryDialog.hidden = true;
     this.renderWelcome();
     this.el.welcomeDialog.hidden = false;
     requestAnimationFrame(() => {
@@ -1759,6 +2064,100 @@
       });
       this.el.welcomeRecent.append(button);
     });
+  };
+
+  Controller.prototype.openRecovery = function () {
+    if (!this.el.recoveryDialog) return;
+    if (this.el.shortcutSheet) this.el.shortcutSheet.hidden = true;
+    if (this.el.commandPalette) this.el.commandPalette.hidden = true;
+    if (this.el.welcomeDialog) this.el.welcomeDialog.hidden = true;
+    if (this.el.mindMenu) this.el.mindMenu.removeAttribute("open");
+    this.renderRecovery();
+    this.el.recoveryDialog.hidden = false;
+    requestAnimationFrame(() => {
+      if (this.el.recoveryCloseButton) this.el.recoveryCloseButton.focus();
+    });
+  };
+
+  Controller.prototype.closeRecovery = function () {
+    if (!this.el.recoveryDialog) return;
+    this.el.recoveryDialog.hidden = true;
+    this.el.svg.focus();
+  };
+
+  Controller.prototype.renderRecovery = function () {
+    if (this.el.recoveryCurrentStats) {
+      this.el.recoveryCurrentStats.textContent = recoveryStats(this.mind, this.maps, new Date().toISOString());
+    }
+    if (!this.el.recoveryList) return;
+    this.el.recoveryList.replaceChildren();
+    if (!this.recentMinds.length) {
+      const empty = document.createElement("span");
+      empty.textContent = "No recovery points yet";
+      this.el.recoveryList.append(empty);
+      return;
+    }
+    this.recentMinds.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "recovery-item";
+      const meta = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = item.label;
+      const detail = document.createElement("span");
+      detail.textContent = recoveryItemDetail(item);
+      meta.append(title, detail);
+
+      const actions = document.createElement("div");
+      const restore = document.createElement("button");
+      restore.type = "button";
+      restore.textContent = "Restore";
+      restore.addEventListener("click", () => this.restoreRecoveryPoint(item.id));
+      const download = document.createElement("button");
+      download.type = "button";
+      download.textContent = "Download";
+      download.addEventListener("click", () => this.exportRecoveryPoint(item.id));
+      actions.append(restore, download);
+      row.append(meta, actions);
+      this.el.recoveryList.append(row);
+    });
+  };
+
+  Controller.prototype.saveRecoveryPoint = function () {
+    const result = this.rememberCurrentMind();
+    if (!result) {
+      this.updateStatus("Recovery point failed");
+      return;
+    }
+    this.renderRecovery();
+    this.renderWelcome();
+    this.updateStatus(result === "duplicate" ? "Recovery already current" : "Recovery point saved");
+  };
+
+  Controller.prototype.restoreRecoveryPoint = function (recentId) {
+    if (!confirm("Restore this recovery point and replace current browser mind?")) return;
+    this.closeRecovery();
+    this.openRecentMind(recentId);
+  };
+
+  Controller.prototype.exportCurrentRecoveryBackup = function () {
+    const payload = this.mindExportPayload();
+    exportJsonPayload(payload, mindFilename(this.mind.nodes[this.mind.rootId]?.label || "mind"));
+    this.updateStatus("Backup downloaded");
+  };
+
+  Controller.prototype.exportRecoveryPoint = function (recentId) {
+    const item = this.recentMinds.find((recent) => recent.id === recentId);
+    if (!item) {
+      this.updateStatus("Recovery point missing");
+      return;
+    }
+    const payload = Object.assign({
+      type: "concen-mind",
+      version: 1,
+      exportedAt: new Date().toISOString()
+    }, item.snapshot);
+    exportJsonPayload(payload, mindFilename(item.label || "recovery"));
+    this.updateStatus("Recovery point downloaded");
   };
 
   Controller.prototype.applyWelcomeStyle = function (style) {
@@ -1916,6 +2315,7 @@
 
   Controller.prototype.commandItems = function (query) {
     const focusedNode = this.currentMindNode();
+    const mindIndex = this.getMindIndex();
     const commands = [
       { kind: "command", title: "Add child", detail: "Enter", run: () => this.addNode(true) },
       { kind: "command", title: "Show welcome", detail: "Templates, recents, shortcuts", run: () => this.openWelcome() },
@@ -1930,6 +2330,7 @@
       { kind: "command", title: "New mind", detail: "Blank document", run: () => this.newMind() },
       { kind: "command", title: "Save mind", detail: "Local autosave", run: () => this.save() },
       { kind: "command", title: "Save copy", detail: ".mind.json", run: () => this.exportMind() },
+      { kind: "command", title: "Recovery", detail: "Backups and restore points", run: () => this.openRecovery() },
       { kind: "command", title: "Push to GitHub", detail: "Commit current mind JSON", run: () => this.pushMindToGithub() },
       { kind: "command", title: "Pull from GitHub", detail: "Replace current mind from repo", run: () => this.pullMindFromGithub() },
       { kind: "command", title: "Clear recents", detail: "Remove stored snapshots", run: () => this.clearRecentMinds() },
@@ -1941,10 +2342,11 @@
       { kind: "command", title: "Toggle light/dark", detail: "Theme", run: () => this.toggleTheme() },
       { kind: "command", title: "Next style", detail: "Style theme", run: () => this.cycleStylePreset() },
       { kind: "command", title: "Next navigation mode", detail: "Arrow policy", run: () => this.cycleNavigationMode() },
-      { kind: "command", title: "Next view mode", detail: "Flat, radial, book", run: () => this.toggleViewMode() },
+      { kind: "command", title: "Next view mode", detail: "Flat, radial, tree, book", run: () => this.toggleViewMode() },
       { kind: "command", title: "Flat view", detail: "Single outer ring", run: () => this.setViewMode("tree") },
       { kind: "command", title: "Radial view", detail: "Hierarchical scatter disk", run: () => this.setViewMode("radial") },
-      { kind: "command", title: "Book view", detail: "Chapters, sections, notes", run: () => this.setViewMode("book") },
+      { kind: "command", title: "Tree view", detail: "Structured columns", run: () => this.setViewMode("book") },
+      { kind: "command", title: "Book view", detail: "Document outline", run: () => this.setViewMode("document") },
       { kind: "command", title: "Undo", detail: "Ctrl+Z", run: () => this.undo() },
       { kind: "command", title: "Redo", detail: "Ctrl+Shift+Z", run: () => this.redo() }
     ];
@@ -1973,14 +2375,14 @@
       recentId: item.id,
       text: `${item.label} recent mind`.toLowerCase()
     }));
-    const nodes = Object.values(this.mind.nodes).map((node) => ({
+    const nodes = mindIndex.searchItems.map((item) => ({
       kind: "node",
-      title: node.label,
-      detail: nodeSearchDetail(this.mind, node),
-      sourceId: node.id,
-      text: `${node.label} ${node.note || ""} ${node.status || ""} ${node.priority || ""} ${(node.tags || []).join(" ")}`.toLowerCase()
+      title: item.node.label,
+      detail: item.detail,
+      sourceId: item.node.id,
+      text: item.text
     }));
-    const linkedNodes = focusedNode ? noteLinkItems(focusedNode.note || "", this.mind)
+    const linkedNodes = focusedNode ? noteLinkItems(focusedNode.note || "", this.mind, mindIndex)
       .filter((item) => item.kind === "node")
       .map((item) => ({
         kind: "node",
@@ -2101,7 +2503,7 @@
   };
 
   Controller.prototype.toggleViewMode = function () {
-    const modes = ["tree", "radial", "book"];
+    const modes = ["tree", "radial", "book", "document"];
     const index = modes.indexOf(this.viewMode);
     this.setViewMode(modes[(index + 1) % modes.length]);
   };
@@ -2247,6 +2649,7 @@
   };
 
   Controller.prototype.mindExportPayload = function () {
+    if (this.noteSaveTimer) this.saveFocusedNote();
     this.captureActiveMap();
     return {
       type: "concen-mind",
@@ -2427,16 +2830,20 @@
     return next;
   };
 
-  Controller.prototype.clearRecentMinds = function () {
+  Controller.prototype.clearRecentMinds = function (source) {
+    const recoveryLabel = source === "recovery";
+    if (!confirm(recoveryLabel ? "Clear all recovery points?" : "Clear recent minds?")) return;
     this.recentMinds = [];
     saveRecentMinds(this.recentMinds);
-    this.updateStatus("Recent minds cleared");
+    this.renderRecovery();
+    this.renderWelcome();
+    this.updateStatus(recoveryLabel ? "Recovery points cleared" : "Recent minds cleared");
   };
 
   Controller.prototype.rememberCurrentMind = function () {
     this.captureActiveMap();
     const label = this.mind.nodes[this.mind.rootId]?.label || "Untitled Mind";
-    const snapshot = {
+    const snapshot = cloneSnapshot({
       mind: this.mind,
       maps: this.maps,
       activeMapId: this.activeMapId,
@@ -2444,14 +2851,17 @@
       theme: this.theme,
       customTheme: this.customTheme,
       branchColors: this.branchColors
-    };
+    });
     const raw = JSON.stringify(snapshot);
-    if (raw.length > config.limits.maxStoredBytes) return;
+    if (raw.length > config.limits.maxStoredBytes) return false;
+    if (this.recentMinds[0] && JSON.stringify(this.recentMinds[0].snapshot) === raw) return "duplicate";
     const id = "recent-" + Date.now().toString(36);
-    this.recentMinds = [
+    const next = [
       { id, label, updatedAt: new Date().toISOString(), snapshot }
-    ].concat(this.recentMinds).slice(0, 6);
-    saveRecentMinds(this.recentMinds);
+    ].concat(this.recentMinds).slice(0, RECENT_MAX_ITEMS);
+    if (!saveRecentMinds(next)) return false;
+    this.recentMinds = loadRecentMinds();
+    return "saved";
   };
 
   Controller.prototype.openRecentMind = function (recentId) {
@@ -2543,9 +2953,8 @@
       return;
     }
     this.fitBounds(this.currentBounds);
-    this.pendingRenderStatus = "Fit view";
     this.updateStatus("Fit view");
-    this.scheduleRender(false);
+    this.updateCameraView();
   };
 
   Controller.prototype.zoomBy = function (factor) {
@@ -2559,9 +2968,7 @@
     this.camera.x = before.x - view.width / 2;
     this.camera.y = before.y - view.height / 2;
     this.clampCamera();
-    this.pendingRenderStatus = Math.round(this.camera.scale * 100) + "% zoom";
-    this.updateStatus(this.pendingRenderStatus);
-    this.scheduleRender(false);
+    this.updateCameraView(Math.round(this.camera.scale * 100) + "% zoom");
   };
 
   Controller.prototype.zoomAt = function (clientX, clientY, deltaY) {
@@ -2573,7 +2980,7 @@
     this.camera.x = before.x - ((clientX - rect.left) / rect.width) * view.width;
     this.camera.y = before.y - ((clientY - rect.top) / rect.height) * view.height;
     this.clampCamera();
-    this.scheduleRender(false);
+    this.updateCameraView();
   };
 
   Controller.prototype.clientToWorld = function (clientX, clientY) {
@@ -2583,6 +2990,13 @@
       x: view.x + ((clientX - rect.left) / rect.width) * view.width,
       y: view.y + ((clientY - rect.top) / rect.height) * view.height
     };
+  };
+
+  Controller.prototype.updateCameraView = function (status) {
+    this.renderer.setViewBox(this.viewBox());
+    if (status) this.updateStatus(status);
+    this.positionEditor();
+    this.positionActionBar();
   };
 
   Controller.prototype.startPan = function (event) {
@@ -2747,7 +3161,7 @@
     this.camera.x = this.panStart.cameraX - ((event.clientX - this.panStart.clientX) / rect.width) * this.panStart.view.width;
     this.camera.y = this.panStart.cameraY - ((event.clientY - this.panStart.clientY) / rect.height) * this.panStart.view.height;
     this.clampCamera();
-    this.scheduleRender(false);
+    this.updateCameraView();
   };
 
   Controller.prototype.endPan = function (event) {
@@ -2818,7 +3232,7 @@
   }
 
   function normalizeViewMode(mode) {
-    return ["tree", "radial", "book"].includes(mode) ? mode : "radial";
+    return ["tree", "radial", "book", "document"].includes(mode) ? mode : "radial";
   }
 
   function usesSpatialNavigation(mode) {
@@ -2879,6 +3293,57 @@
   function mindFilename(label) {
     const slug = utils.cleanId(label.toLowerCase().replace(/\s+/g, "-"), "mind");
     return slug + ".mind.json";
+  }
+
+  function exportJsonPayload(payload, filename) {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function cloneSnapshot(snapshot) {
+    return JSON.parse(JSON.stringify(snapshot));
+  }
+
+  function pushBoundedSnapshot(stack, currentBytes, raw) {
+    stack.push(raw);
+    let bytes = currentBytes + raw.length;
+    while (stack.length > UNDO_MAX_ITEMS) {
+      bytes -= stack.shift().length;
+    }
+    while (bytes > UNDO_MAX_BYTES && stack.length > 1) {
+      bytes -= stack.shift().length;
+    }
+    return Math.max(0, bytes);
+  }
+
+  function recoveryStats(mind, maps, updatedAt) {
+    const nodeCount = mind && mind.nodes ? Object.keys(mind.nodes).length : 0;
+    const mapCount = Array.isArray(maps) ? maps.length : 0;
+    const stamp = updatedAt ? shortDate(updatedAt) : "unknown time";
+    return `${nodeCount} nodes · ${mapCount} maps · ${stamp}`;
+  }
+
+  function recoveryItemDetail(item) {
+    const snapshot = item && item.snapshot || {};
+    return recoveryStats(snapshot.mind, snapshot.maps, item && item.updatedAt);
+  }
+
+  function shortDate(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "unknown time";
+    return date.toLocaleString([], {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit"
+    });
   }
 
   function githubSettingsFilename(sync) {
@@ -3103,7 +3568,37 @@
     return tokens;
   }
 
-  function noteLinkItems(note, mind) {
+  function buildMindIndex(mind) {
+    const nodes = Object.values(mind.nodes).map((node) => ({
+      node,
+      labelKey: String(node.label || "").trim().toLowerCase()
+    }));
+    const labelMap = new Map();
+    nodes.forEach((item) => {
+      if (item.labelKey && !labelMap.has(item.labelKey)) labelMap.set(item.labelKey, item.node);
+    });
+    const index = {
+      nodes,
+      labelMap,
+      backlinks: new Map(),
+      searchItems: nodes.map((item) => ({
+        node: item.node,
+        detail: nodeSearchDetail(mind, item.node),
+        text: `${item.node.label} ${item.node.note || ""} ${item.node.status || ""} ${item.node.priority || ""} ${(item.node.tags || []).join(" ")}`.toLowerCase()
+      }))
+    };
+    nodes.forEach((item) => {
+      noteLinkedNodeIds(item.node.note, mind, index).forEach((targetId) => {
+        if (targetId === item.node.id) return;
+        const list = index.backlinks.get(targetId) || [];
+        list.push({ sourceId: item.node.id, label: item.node.label });
+        index.backlinks.set(targetId, list);
+      });
+    });
+    return index;
+  }
+
+  function noteLinkItems(note, mind, mindIndex) {
     const items = [];
     const seen = new Set();
     const text = String(note || "");
@@ -3118,7 +3613,7 @@
         items.push({ kind: "url", href, label: link.title || href });
         continue;
       }
-      const node = linkedNode(link.target, mind);
+      const node = linkedNode(link.target, mind, mindIndex);
       if (!node || seen.has("node:" + node.id)) continue;
       seen.add("node:" + node.id);
       items.push({ kind: "node", sourceId: node.id, label: "Node: " + (link.title || node.label) });
@@ -3133,25 +3628,22 @@
     return items.slice(0, 8);
   }
 
-  function backlinkItems(mind, targetNode) {
-    const targetLabel = targetNode.label.trim().toLowerCase();
-    if (!targetNode.id || !targetLabel) return [];
-    return Object.values(mind.nodes)
-      .filter((node) => node.id !== targetNode.id && noteLinksToNode(node.note, mind, targetNode.id, targetLabel))
-      .map((node) => ({ sourceId: node.id, label: node.label }));
+  function backlinkItems(mindIndex, targetNode) {
+    if (!targetNode || !targetNode.id) return [];
+    return (mindIndex.backlinks.get(targetNode.id) || []).slice();
   }
 
-  function noteLinksToNode(note, mind, targetId, targetLabel) {
+  function noteLinkedNodeIds(note, mind, mindIndex) {
+    const ids = new Set();
     const text = String(note || "");
     const wikiPattern = /\[\[([^\]]{1,240})\]\]/g;
     for (const match of text.matchAll(wikiPattern)) {
       const link = parseWikiLink(match[1]);
       if (isHttpUrl(link.target)) continue;
-      const node = linkedNode(link.target, mind);
-      if (node && node.id === targetId) return true;
-      if (!node && link.target.trim().toLowerCase() === targetLabel) return true;
+      const node = linkedNode(link.target, mind, mindIndex);
+      if (node) ids.add(node.id);
     }
-    return false;
+    return ids;
   }
 
   function parseWikiLink(value) {
@@ -3164,12 +3656,13 @@
     };
   }
 
-  function linkedNode(target, mind) {
+  function linkedNode(target, mind, mindIndex) {
     const raw = String(target || "").trim();
     if (!raw) return null;
     const id = raw.startsWith("node:") ? raw.slice(5).trim() : "";
     if (id && mind.nodes[id]) return mind.nodes[id];
     const label = raw.toLowerCase();
+    if (mindIndex && mindIndex.labelMap) return mindIndex.labelMap.get(label) || null;
     return Object.values(mind.nodes).find((item) => item.label.trim().toLowerCase() === label) || null;
   }
 
@@ -3308,223 +3801,73 @@
     if (style === "papery") return dark ? darkPaperyTokens() : lightPaperyTokens();
     if (style === "blueprint") return blueprintTokens();
     if (style === "terminal") return terminalTokens();
-    if (style === "index-card") return indexCardTokens(dark);
-    if (style === "radar") return radarTokens();
-    if (style === "kanban") return kanbanTokens(dark);
     if (style === "schematic") return schematicTokens(dark);
     return null;
   }
 
-  function indexCardTokens(dark) {
-    return dark ? {
-      bg: "#151514",
-      surface: "rgba(37, 36, 33, 0.78)",
-      "surface-solid": "#252421",
-      "surface-raised": "rgba(48, 46, 42, 0.92)",
-      "surface-recessed": "rgba(30, 29, 26, 0.9)",
-      "glass-border": "rgba(239, 232, 209, 0.16)",
-      hairline: "rgba(239, 232, 209, 0.12)",
-      field: "rgba(36, 34, 31, 0.94)",
-      "field-hover": "rgba(48, 45, 40, 0.96)",
-      control: "linear-gradient(180deg, rgba(57, 54, 48, 0.92), rgba(40, 38, 34, 0.94))",
-      "control-hover": "linear-gradient(180deg, rgba(67, 63, 56, 0.96), rgba(48, 45, 40, 0.98))",
-      "control-pressed": "linear-gradient(180deg, rgba(34, 32, 29, 0.98), rgba(58, 54, 48, 0.94))",
-      "control-ink": "#f4ecd7",
-      focus: "#d8a545",
-      "focus-soft": "rgba(216, 165, 69, 0.24)",
-      "path-glow": "rgba(216, 165, 69, 0.3)",
-      "path-fill": "rgba(216, 165, 69, 0.08)",
-      "sibling-glow": "rgba(118, 169, 133, 0.2)",
-      "sibling-fill": "rgba(118, 169, 133, 0.06)",
-      ink: "#f4ecd7",
-      muted: "#c4b696",
-      label: "#ad9e7d",
-      "canvas-bg": "#211f1a",
-      "canvas-grid": "rgba(244, 236, 215, 0.055)",
-      "canvas-wash": "rgba(76, 68, 48, 0.3)",
-      "ring-guide": "rgba(216, 165, 69, 0.23)",
-      "node-fill": "rgba(46, 43, 36, 0.94)",
-      "node-ink": "#f7efd9",
-      "root-node-fill": "#d8a545",
-      "root-node-ink": "#1b1408",
-      "shadow-sm": "0 1px 1px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(255, 248, 221, 0.06) inset",
-      "shadow-md": "0 10px 24px rgba(0, 0, 0, 0.3)",
-      "shadow-lg": "0 22px 54px rgba(0, 0, 0, 0.42)",
-      "node-shadow": "drop-shadow(0 7px 12px rgba(0, 0, 0, 0.32))"
-    } : {
-      bg: "#eee8d6",
-      surface: "rgba(255, 253, 244, 0.78)",
-      "surface-solid": "#fffaf0",
-      "surface-raised": "rgba(255, 253, 246, 0.94)",
-      "surface-recessed": "rgba(239, 232, 211, 0.78)",
-      "glass-border": "rgba(117, 104, 76, 0.2)",
-      hairline: "rgba(117, 104, 76, 0.15)",
-      field: "rgba(255, 253, 246, 0.94)",
-      "field-hover": "#fffdf6",
-      control: "linear-gradient(180deg, rgba(255, 252, 242, 0.97), rgba(237, 228, 207, 0.9))",
-      "control-hover": "linear-gradient(180deg, #fffdf6, rgba(232, 220, 194, 0.94))",
-      "control-pressed": "linear-gradient(180deg, rgba(224, 211, 181, 0.92), rgba(250, 244, 230, 0.98))",
-      "control-ink": "#2b261c",
-      focus: "#b77a1f",
-      "focus-soft": "rgba(183, 122, 31, 0.2)",
-      "path-glow": "rgba(183, 122, 31, 0.24)",
-      "path-fill": "rgba(183, 122, 31, 0.055)",
-      "sibling-glow": "rgba(68, 125, 83, 0.18)",
-      "sibling-fill": "rgba(68, 125, 83, 0.045)",
-      ink: "#2b261c",
-      muted: "#706753",
-      label: "#817354",
-      "canvas-bg": "#f7f1df",
-      "canvas-grid": "rgba(117, 104, 76, 0.07)",
-      "canvas-wash": "rgba(255, 252, 242, 0.66)",
-      "ring-guide": "rgba(117, 104, 76, 0.28)",
-      "node-fill": "rgba(255, 252, 242, 0.96)",
-      "node-ink": "#2b261c",
-      "root-node-fill": "#2f3328",
-      "root-node-ink": "#fffaf0",
-      "shadow-sm": "0 1px 1px rgba(82, 69, 40, 0.08), 0 1px 0 rgba(255, 255, 255, 0.58) inset",
-      "shadow-md": "0 8px 18px rgba(82, 69, 40, 0.12)",
-      "shadow-lg": "0 18px 42px rgba(82, 69, 40, 0.16)",
-      "node-shadow": "drop-shadow(0 5px 8px rgba(82, 69, 40, 0.13))"
-    };
+  function populateSelectOptions(select, presets, groups) {
+    if (!select || !presets) return;
+    if (groups) {
+      Object.values(groups).forEach((group) => {
+        const optgroup = document.createElement("optgroup");
+        optgroup.label = group.label;
+        group.variants.forEach((key) => {
+          const preset = presets[key];
+          if (!preset) return;
+          const option = document.createElement("option");
+          option.value = key;
+          option.textContent = preset.label;
+          optgroup.append(option);
+        });
+        if (optgroup.children.length) select.append(optgroup);
+      });
+      return;
+    }
+    Object.entries(presets).forEach(([key, preset]) => {
+      const option = document.createElement("option");
+      option.value = key;
+      option.textContent = preset.label;
+      select.append(option);
+    });
   }
 
-  function radarTokens() {
-    return {
-      bg: "#090f12",
-      surface: "rgba(12, 24, 27, 0.76)",
-      "surface-solid": "#0d1b1f",
-      "surface-raised": "rgba(17, 31, 36, 0.9)",
-      "surface-recessed": "rgba(8, 16, 19, 0.9)",
-      "glass-border": "rgba(88, 214, 141, 0.18)",
-      hairline: "rgba(88, 214, 141, 0.13)",
-      field: "rgba(10, 21, 24, 0.94)",
-      "field-hover": "rgba(15, 30, 34, 0.98)",
-      control: "linear-gradient(180deg, rgba(24, 52, 58, 0.9), rgba(12, 28, 32, 0.94))",
-      "control-hover": "linear-gradient(180deg, rgba(31, 68, 74, 0.96), rgba(15, 36, 40, 0.98))",
-      "control-pressed": "linear-gradient(180deg, rgba(7, 20, 23, 0.98), rgba(26, 56, 62, 0.94))",
-      "control-ink": "#d9ffe8",
-      focus: "#58d68d",
-      "focus-soft": "rgba(88, 214, 141, 0.24)",
-      "path-glow": "rgba(88, 214, 141, 0.34)",
-      "path-fill": "rgba(88, 214, 141, 0.07)",
-      "sibling-glow": "rgba(56, 189, 248, 0.2)",
-      "sibling-fill": "rgba(56, 189, 248, 0.055)",
-      ink: "#e6fff0",
-      muted: "#9dc9b0",
-      label: "#83b89b",
-      "canvas-bg": "#061013",
-      "canvas-grid": "rgba(88, 214, 141, 0.12)",
-      "canvas-wash": "rgba(14, 116, 144, 0.12)",
-      "ring-guide": "rgba(88, 214, 141, 0.42)",
-      "node-fill": "rgba(9, 28, 31, 0.92)",
-      "node-ink": "#d9ffe8",
-      "root-node-fill": "#58d68d",
-      "root-node-ink": "#06100a",
-      "node-shadow": "drop-shadow(0 0 12px rgba(88, 214, 141, 0.2))"
-    };
-  }
-
-  function kanbanTokens(dark) {
-    return dark ? {
-      bg: "#171312",
-      surface: "rgba(45, 35, 32, 0.76)",
-      "surface-solid": "#2b211f",
-      "surface-raised": "rgba(55, 42, 38, 0.9)",
-      "surface-recessed": "rgba(31, 24, 22, 0.9)",
-      "glass-border": "rgba(242, 120, 83, 0.16)",
-      hairline: "rgba(242, 120, 83, 0.12)",
-      field: "rgba(44, 34, 31, 0.92)",
-      "field-hover": "rgba(57, 43, 39, 0.96)",
-      control: "linear-gradient(180deg, rgba(63, 48, 43, 0.9), rgba(42, 32, 29, 0.94))",
-      "control-hover": "linear-gradient(180deg, rgba(76, 57, 51, 0.96), rgba(50, 38, 34, 0.98))",
-      "control-pressed": "linear-gradient(180deg, rgba(35, 26, 24, 0.98), rgba(65, 49, 44, 0.94))",
-      "control-ink": "#f7ede8",
-      focus: "#f27853",
-      "focus-soft": "rgba(242, 120, 83, 0.24)",
-      "path-glow": "rgba(242, 120, 83, 0.3)",
-      "path-fill": "rgba(242, 120, 83, 0.08)",
-      "sibling-glow": "rgba(125, 211, 252, 0.18)",
-      "sibling-fill": "rgba(125, 211, 252, 0.055)",
-      ink: "#f7ede8",
-      muted: "#c8aaa1",
-      label: "#b89084",
-      "canvas-bg": "#181515",
-      "canvas-grid": "rgba(255, 255, 255, 0.055)",
-      "canvas-wash": "rgba(66, 40, 35, 0.28)",
-      "ring-guide": "rgba(242, 120, 83, 0.24)",
-      "node-fill": "rgba(40, 34, 32, 0.94)",
-      "node-ink": "#f9eee9",
-      "root-node-fill": "#f27853",
-      "root-node-ink": "#1b100d",
-      "node-shadow": "drop-shadow(0 9px 14px rgba(0, 0, 0, 0.28))"
-    } : {
-      bg: "#f2f5f0",
-      surface: "rgba(255, 255, 255, 0.78)",
-      "surface-solid": "#ffffff",
-      "surface-raised": "rgba(255, 255, 255, 0.94)",
-      "surface-recessed": "rgba(232, 238, 232, 0.82)",
-      "glass-border": "rgba(75, 85, 99, 0.18)",
-      hairline: "rgba(75, 85, 99, 0.13)",
-      field: "rgba(255, 255, 255, 0.94)",
-      "field-hover": "#ffffff",
-      control: "linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(229, 235, 229, 0.9))",
-      "control-hover": "linear-gradient(180deg, #ffffff, rgba(220, 229, 222, 0.94))",
-      "control-pressed": "linear-gradient(180deg, rgba(211, 222, 214, 0.92), rgba(246, 249, 246, 0.98))",
-      "control-ink": "#1f2933",
-      focus: "#0f6f9e",
-      "focus-soft": "rgba(15, 111, 158, 0.18)",
-      "path-glow": "rgba(15, 111, 158, 0.24)",
-      "path-fill": "rgba(15, 111, 158, 0.05)",
-      "sibling-glow": "rgba(197, 95, 44, 0.16)",
-      "sibling-fill": "rgba(197, 95, 44, 0.045)",
-      ink: "#1f2933",
-      muted: "#66727f",
-      label: "#758392",
-      "canvas-bg": "#f5f7f4",
-      "canvas-grid": "rgba(75, 85, 99, 0.055)",
-      "canvas-wash": "rgba(255, 255, 255, 0.66)",
-      "ring-guide": "rgba(15, 111, 158, 0.24)",
-      "node-fill": "rgba(255, 255, 255, 0.94)",
-      "node-ink": "#1f2933",
-      "root-node-fill": "#243447",
-      "root-node-ink": "#ffffff",
-      "node-shadow": "drop-shadow(0 8px 12px rgba(36, 52, 71, 0.14))"
-    };
+  function isCanvasPointerTarget(target, svg) {
+    if (!target || !svg) return false;
+    return target === svg || target.ownerSVGElement === svg;
   }
 
   function schematicTokens(dark) {
     return dark ? {
-      bg: "#111315",
-      surface: "rgba(29, 32, 35, 0.76)",
-      "surface-solid": "#202428",
-      "surface-raised": "rgba(39, 43, 48, 0.9)",
-      "surface-recessed": "rgba(20, 23, 26, 0.9)",
-      "glass-border": "rgba(190, 202, 214, 0.16)",
-      hairline: "rgba(190, 202, 214, 0.12)",
-      field: "rgba(25, 28, 31, 0.94)",
-      "field-hover": "rgba(35, 39, 43, 0.98)",
-      control: "linear-gradient(180deg, rgba(55, 60, 66, 0.88), rgba(35, 39, 44, 0.92))",
-      "control-hover": "linear-gradient(180deg, rgba(66, 72, 79, 0.94), rgba(42, 47, 52, 0.96))",
-      "control-pressed": "linear-gradient(180deg, rgba(28, 31, 35, 0.98), rgba(57, 62, 68, 0.92))",
-      "control-ink": "#f0f3f5",
-      focus: "#f2c94c",
-      "focus-soft": "rgba(242, 201, 76, 0.22)",
-      "path-glow": "rgba(242, 201, 76, 0.25)",
-      "path-fill": "rgba(242, 201, 76, 0.055)",
-      "sibling-glow": "rgba(148, 163, 184, 0.2)",
-      "sibling-fill": "rgba(148, 163, 184, 0.055)",
-      ink: "#f0f3f5",
-      muted: "#b6c1cb",
-      label: "#a4b0ba",
-      "canvas-bg": "#15181b",
-      "canvas-grid": "rgba(203, 213, 225, 0.09)",
-      "canvas-wash": "rgba(55, 65, 81, 0.18)",
-      "ring-guide": "rgba(203, 213, 225, 0.3)",
-      "node-fill": "rgba(24, 28, 32, 0.94)",
-      "node-ink": "#f0f3f5",
-      "root-node-fill": "#f0f3f5",
-      "root-node-ink": "#111315",
+      bg: "#0b1111",
+      surface: "rgba(17, 27, 27, 0.8)",
+      "surface-solid": "#142020",
+      "surface-raised": "rgba(25, 39, 39, 0.92)",
+      "surface-recessed": "rgba(8, 15, 15, 0.9)",
+      "glass-border": "rgba(125, 211, 252, 0.18)",
+      hairline: "rgba(125, 211, 252, 0.12)",
+      field: "rgba(10, 18, 18, 0.94)",
+      "field-hover": "rgba(18, 31, 31, 0.98)",
+      control: "linear-gradient(180deg, rgba(31, 52, 52, 0.9), rgba(16, 29, 29, 0.94))",
+      "control-hover": "linear-gradient(180deg, rgba(41, 69, 69, 0.94), rgba(22, 39, 39, 0.98))",
+      "control-pressed": "linear-gradient(180deg, rgba(7, 14, 14, 0.98), rgba(33, 57, 57, 0.9))",
+      "control-ink": "#e8fffb",
+      focus: "#7dd3fc",
+      "focus-soft": "rgba(125, 211, 252, 0.22)",
+      "path-glow": "rgba(125, 211, 252, 0.28)",
+      "path-fill": "rgba(125, 211, 252, 0.06)",
+      "sibling-glow": "rgba(244, 184, 92, 0.22)",
+      "sibling-fill": "rgba(244, 184, 92, 0.055)",
+      ink: "#e8fffb",
+      muted: "#a8c9c7",
+      label: "#90b4b2",
+      "canvas-bg": "#0c1515",
+      "canvas-grid": "rgba(125, 211, 252, 0.08)",
+      "canvas-wash": "rgba(56, 189, 248, 0.1)",
+      "ring-guide": "rgba(125, 211, 252, 0.3)",
+      "node-fill": "rgba(17, 29, 30, 0.96)",
+      "node-ink": "#e8fffb",
+      "root-node-fill": "#7dd3fc",
+      "root-node-ink": "#061112",
       "node-shadow": "drop-shadow(0 5px 8px rgba(0, 0, 0, 0.22))"
     } : {
       bg: "#f0f2f3",
@@ -3669,7 +4012,7 @@
           updatedAt: item.updatedAt || "",
           snapshot: item.snapshot
         }))
-        .slice(0, 6);
+        .slice(0, RECENT_MAX_ITEMS);
     } catch (error) {
       return [];
     }
@@ -3677,7 +4020,14 @@
 
   function saveRecentMinds(items) {
     try {
-      localStorage.setItem(config.recentMindsKey, JSON.stringify(items.slice(0, 6)));
+      const trimmed = items.slice(0, RECENT_MAX_ITEMS);
+      let raw = JSON.stringify(trimmed);
+      while (raw.length > config.limits.maxStoredBytes && trimmed.length > 1) {
+        trimmed.pop();
+        raw = JSON.stringify(trimmed);
+      }
+      if (raw.length > config.limits.maxStoredBytes) return false;
+      localStorage.setItem(config.recentMindsKey, raw);
     } catch (error) {
       return false;
     }

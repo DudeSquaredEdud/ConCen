@@ -44,6 +44,7 @@
           <label class="map-field">
             <span>Map</span>
             <select id="mapSelect"></select>
+            <div id="mapSelectDropdown" class="custom-select map-select-dropdown" data-for="mapSelect"></div>
           </label>
           <button id="parentMapButton" class="icon-button" data-icon="‹" type="button" title="Go to parent map (Ctrl+Left)" aria-label="Go to parent map">
             <span class="visually-hidden">Parent Map</span>
@@ -90,6 +91,7 @@
               <button id="newMindButton" type="button" data-icon="+">New Mind</button>
               <button id="saveMindButton" type="button" data-icon="✓">Save Mind</button>
               <button id="exportMindButton" type="button" data-icon="⇧">Save Copy</button>
+              <button id="recoveryButton" type="button" data-icon="↺">Recovery</button>
               <label class="import-mind" data-icon="⇩">
                 <span>Open Mind</span>
                 <input id="importMindInput" type="file" accept="application/json,.json">
@@ -146,14 +148,26 @@
                 <label class="theme-field">
                   <span>Theme</span>
                   <select id="themePresetInput"></select>
+                  <div id="themePresetDropdown" class="custom-select" data-for="themePresetInput"></div>
                 </label>
                 <label class="theme-field">
                   <span>Style</span>
                   <select id="stylePresetInput"></select>
+                  <div id="stylePresetDropdown" class="custom-select" data-for="stylePresetInput"></div>
+                </label>
+                <label class="theme-field">
+                  <span>Background</span>
+                  <select id="backgroundEffectInput"></select>
+                  <div id="backgroundEffectDropdown" class="custom-select" data-for="backgroundEffectInput"></div>
+                </label>
+                <label id="backgroundImageUpload" class="background-upload import-theme" data-icon="⇧" hidden>
+                  <span>Upload image</span>
+                  <input id="backgroundImageInput" type="file" accept="image/*">
                 </label>
                 <label class="theme-field">
                   <span>Navigation</span>
                   <select id="navigationModeInput"></select>
+                  <div id="navigationModeDropdown" class="custom-select" data-for="navigationModeInput"></div>
                 </label>
                 <div id="customThemeEditor" class="custom-theme-editor" aria-label="Custom theme colors" hidden></div>
                 <div>
@@ -176,7 +190,8 @@
                   <div class="segmented-control view-mode-control" role="group" aria-label="View mode">
                     <button id="treeViewButton" type="button" aria-pressed="false">Flat</button>
                     <button id="radialViewButton" type="button" aria-pressed="false">Radial</button>
-                    <button id="bookViewButton" type="button" aria-pressed="false">Book</button>
+                    <button id="bookViewButton" type="button" aria-pressed="false">Tree</button>
+                    <button id="documentViewButton" type="button" aria-pressed="false">Book</button>
                   </div>
                   <div class="layout-preset-row" role="group" aria-label="Layout presets">
                     <button type="button" data-layout-preset="compact">Compact</button>
@@ -184,35 +199,41 @@
                     <button type="button" data-layout-preset="wide">Wide</button>
                   </div>
                 </div>
-                <div class="range-field" role="group" aria-labelledby="treeLevelGapLabel">
-                  <span id="treeLevelGapLabel">Flat radius</span>
-                  <input id="treeLevelGapRange" type="range" min="40" max="260" step="4" value="82" aria-labelledby="treeLevelGapLabel">
-                  <input id="treeLevelGapInput" type="number" min="40" max="260" step="4" value="82" aria-label="Flat radius value">
-                </div>
-                <div class="range-field" role="group" aria-labelledby="treeLeafGapLabel">
-                  <span id="treeLeafGapLabel">Flat nodes</span>
-                  <input id="treeLeafGapRange" type="range" min="60" max="360" step="4" value="110" aria-labelledby="treeLeafGapLabel">
-                  <input id="treeLeafGapInput" type="number" min="60" max="360" step="4" value="110" aria-label="Flat nodes value">
-                </div>
-                <div class="range-field" role="group" aria-labelledby="ringBaseRadiusLabel">
-                  <span id="ringBaseRadiusLabel">Ring radius</span>
-                  <input id="ringBaseRadiusRange" type="range" min="60" max="500" step="5" value="110" aria-labelledby="ringBaseRadiusLabel">
-                  <input id="ringBaseRadiusInput" type="number" min="60" max="500" step="5" value="110" aria-label="Ring radius value">
-                </div>
-                <div class="range-field" role="group" aria-labelledby="ringDepthGapLabel">
-                  <span id="ringDepthGapLabel">Ring layers</span>
-                  <input id="ringDepthGapRange" type="range" min="60" max="500" step="5" value="100" aria-labelledby="ringDepthGapLabel">
-                  <input id="ringDepthGapInput" type="number" min="60" max="500" step="5" value="100" aria-label="Ring layers value">
-                </div>
-                <div class="range-field" role="group" aria-labelledby="ringNodeGapLabel">
-                  <span id="ringNodeGapLabel">Ring nodes</span>
-                  <input id="ringNodeGapRange" type="range" min="0" max="200" step="4" value="28" aria-labelledby="ringNodeGapLabel">
-                  <input id="ringNodeGapInput" type="number" min="0" max="200" step="4" value="28" aria-label="Ring nodes value">
-                </div>
-                <div class="range-field" role="group" aria-labelledby="nodeFontSizeLabel">
-                  <span id="nodeFontSizeLabel">Font size</span>
-                  <input id="nodeFontSizeRange" type="range" min="9" max="22" step="0.5" value="13" aria-labelledby="nodeFontSizeLabel">
-                  <input id="nodeFontSizeInput" type="number" min="9" max="22" step="0.5" value="13" aria-label="Font size value">
+                <div id="layoutSettingsDropdown" class="layout-settings-dropdown">
+                  <button id="layoutSettingsButton" class="custom-select-button" type="button" aria-expanded="false" aria-controls="layoutSettingsPanel">Tune layout</button>
+                  <div id="layoutSettingsPanel" class="layout-settings-panel" hidden>
+                    <div id="layoutSettingsSummary" class="layout-settings-summary">Flat settings</div>
+                    <div class="range-field" data-spacing-key="treeLevelGap" role="group" aria-labelledby="treeLevelGapLabel">
+                      <span id="treeLevelGapLabel">Layer spacing</span>
+                      <input id="treeLevelGapRange" type="range" min="40" max="260" step="4" value="72" aria-labelledby="treeLevelGapLabel">
+                      <input id="treeLevelGapInput" type="number" min="40" max="260" step="4" value="72" aria-label="Layer spacing value">
+                    </div>
+                    <div class="range-field" data-spacing-key="treeLeafGap" role="group" aria-labelledby="treeLeafGapLabel">
+                      <span id="treeLeafGapLabel">Column spacing</span>
+                      <input id="treeLeafGapRange" type="range" min="32" max="360" step="4" value="92" aria-labelledby="treeLeafGapLabel">
+                      <input id="treeLeafGapInput" type="number" min="32" max="360" step="4" value="92" aria-label="Column spacing value">
+                    </div>
+                    <div class="range-field" data-spacing-key="ringBaseRadius" role="group" aria-labelledby="ringBaseRadiusLabel">
+                      <span id="ringBaseRadiusLabel">Center radius</span>
+                      <input id="ringBaseRadiusRange" type="range" min="40" max="500" step="5" value="102" aria-labelledby="ringBaseRadiusLabel">
+                      <input id="ringBaseRadiusInput" type="number" min="40" max="500" step="5" value="102" aria-label="Center radius value">
+                    </div>
+                    <div class="range-field" data-spacing-key="ringDepthGap" role="group" aria-labelledby="ringDepthGapLabel">
+                      <span id="ringDepthGapLabel">Ring spacing</span>
+                      <input id="ringDepthGapRange" type="range" min="40" max="500" step="5" value="90" aria-labelledby="ringDepthGapLabel">
+                      <input id="ringDepthGapInput" type="number" min="40" max="500" step="5" value="90" aria-label="Ring spacing value">
+                    </div>
+                    <div class="range-field" data-spacing-key="ringNodeGap" role="group" aria-labelledby="ringNodeGapLabel">
+                      <span id="ringNodeGapLabel">Node spacing</span>
+                      <input id="ringNodeGapRange" type="range" min="0" max="200" step="4" value="20" aria-labelledby="ringNodeGapLabel">
+                      <input id="ringNodeGapInput" type="number" min="0" max="200" step="4" value="20" aria-label="Node spacing value">
+                    </div>
+                    <div class="range-field common-range-field" role="group" aria-labelledby="nodeFontSizeLabel">
+                      <span id="nodeFontSizeLabel">Font size</span>
+                      <input id="nodeFontSizeRange" type="range" min="9" max="22" step="0.5" value="13" aria-labelledby="nodeFontSizeLabel">
+                      <input id="nodeFontSizeInput" type="number" min="9" max="22" step="0.5" value="13" aria-label="Font size value">
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -266,6 +287,7 @@
                 <option value="waiting">Waiting</option>
                 <option value="done">Done</option>
               </select>
+              <div id="nodeStatusDropdown" class="custom-select" data-for="nodeStatusInput"></div>
             </label>
             <label>
               <span>Priority</span>
@@ -275,6 +297,7 @@
                 <option value="high">High</option>
                 <option value="critical">Critical</option>
               </select>
+              <div id="nodePriorityDropdown" class="custom-select" data-for="nodePriorityInput"></div>
             </label>
             <label class="wide">
               <span>Tags</span>
@@ -320,6 +343,31 @@
             <span>Pan canvas</span><kbd>Space drag</kbd>
             <span>Show this sheet</span><kbd>Hold Ctrl</kbd>
           </div>
+        </div>
+      </div>
+      <div id="recoveryDialog" class="recovery-dialog" role="dialog" aria-modal="true" aria-label="Recovery" hidden>
+        <div class="recovery-panel">
+          <div class="recovery-head">
+            <div>
+              <span class="welcome-label">Recovery</span>
+              <h2>Backups</h2>
+            </div>
+            <button id="recoveryCloseButton" class="icon-button" data-icon="×" type="button" aria-label="Close recovery">
+              <span class="visually-hidden">Close Recovery</span>
+            </button>
+          </div>
+          <div class="recovery-current">
+            <div>
+              <span>Current autosave</span>
+              <output id="recoveryCurrentStats"></output>
+            </div>
+            <button id="recoveryExportCurrentButton" type="button" data-icon="⇧">Download Backup</button>
+          </div>
+          <div class="recovery-actions">
+            <button id="recoverySavePointButton" type="button" data-icon="+">Save Recovery Point</button>
+            <button id="recoveryClearButton" type="button" class="quiet-danger" data-icon="⌫">Clear Recovery Points</button>
+          </div>
+          <div id="recoveryList" class="recovery-list"></div>
         </div>
       </div>
       <div id="welcomeDialog" class="welcome-dialog" role="dialog" aria-modal="true" aria-label="Welcome to ConCen" hidden>

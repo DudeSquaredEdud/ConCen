@@ -81,6 +81,22 @@
 
 :root[data-style="print"] {
   --blur: none;
+  --bg: #f7f5ef;
+  --surface: #ffffff;
+  --surface-solid: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-recessed: #f2efe7;
+  --glass-border: rgba(67, 58, 43, 0.24);
+  --hairline: rgba(67, 58, 43, 0.18);
+  --field: #ffffff;
+  --field-hover: #fbfaf6;
+  --control: #ffffff;
+  --control-hover: #f7f5ef;
+  --control-pressed: #ece7dc;
+  --control-ink: #201c16;
+  --ink: #201c16;
+  --muted: #655d50;
+  --label: #746b5d;
   --shadow-sm: none;
   --shadow-md: 0 1px 0 var(--hairline);
   --shadow-lg: 0 12px 28px rgba(35, 31, 25, 0.12);
@@ -148,6 +164,22 @@
 }
 
 :root[data-style="blueprint"] {
+  --bg: #061724;
+  --surface: rgba(8, 32, 47, 0.9);
+  --surface-solid: #082033;
+  --surface-raised: rgba(10, 42, 62, 0.94);
+  --surface-recessed: rgba(5, 24, 36, 0.92);
+  --glass-border: rgba(125, 211, 252, 0.28);
+  --hairline: rgba(125, 211, 252, 0.16);
+  --field: rgba(5, 25, 39, 0.94);
+  --field-hover: rgba(8, 39, 60, 0.98);
+  --control: linear-gradient(180deg, rgba(12, 55, 79, 0.94), rgba(6, 31, 47, 0.96));
+  --control-hover: linear-gradient(180deg, rgba(16, 72, 104, 0.98), rgba(8, 41, 61, 0.98));
+  --control-pressed: linear-gradient(180deg, rgba(4, 21, 32, 0.98), rgba(12, 55, 79, 0.92));
+  --control-ink: #dff7ff;
+  --ink: #dff7ff;
+  --muted: #91cbe3;
+  --label: #79b7d2;
   --focus: #38bdf8;
   --focus-soft: rgba(56, 189, 248, 0.22);
   --canvas-bg: #0b2431;
@@ -162,6 +194,22 @@
 }
 
 :root[data-style="terminal"] {
+  --bg: #020712;
+  --surface: rgba(2, 10, 20, 0.92);
+  --surface-solid: #040b16;
+  --surface-raised: rgba(4, 15, 27, 0.96);
+  --surface-recessed: rgba(1, 6, 14, 0.94);
+  --glass-border: rgba(34, 197, 94, 0.28);
+  --hairline: rgba(34, 197, 94, 0.16);
+  --field: rgba(1, 8, 17, 0.94);
+  --field-hover: rgba(3, 18, 29, 0.98);
+  --control: linear-gradient(180deg, rgba(5, 28, 22, 0.94), rgba(2, 13, 20, 0.96));
+  --control-hover: linear-gradient(180deg, rgba(8, 45, 29, 0.98), rgba(3, 21, 24, 0.98));
+  --control-pressed: linear-gradient(180deg, rgba(0, 6, 10, 0.98), rgba(6, 32, 23, 0.92));
+  --control-ink: #bbf7d0;
+  --ink: #bbf7d0;
+  --muted: #7acb97;
+  --label: #5eaa78;
   --focus: #22c55e;
   --focus-soft: rgba(34, 197, 94, 0.22);
   --canvas-bg: #030712;
@@ -176,179 +224,19 @@
 }
 
 :root[data-style="soft"] {
+  --surface: color-mix(in srgb, var(--surface-raised) 84%, transparent);
+  --surface-recessed: color-mix(in srgb, var(--field) 68%, var(--focus-soft));
+  --glass-border: color-mix(in srgb, var(--focus) 16%, var(--hairline));
+  --field: color-mix(in srgb, var(--surface-solid) 88%, var(--focus-soft));
+  --field-hover: color-mix(in srgb, var(--surface-solid) 94%, var(--focus-soft));
+  --control: linear-gradient(180deg, color-mix(in srgb, var(--surface-solid) 92%, var(--focus-soft)), color-mix(in srgb, var(--field) 82%, transparent));
+  --control-hover: linear-gradient(180deg, color-mix(in srgb, var(--surface-solid) 96%, var(--focus-soft)), color-mix(in srgb, var(--field-hover) 88%, transparent));
   --shadow-sm: 0 1px 2px rgba(32, 38, 51, 0.06);
   --shadow-md: 0 16px 36px rgba(32, 38, 51, 0.11);
   --shadow-lg: 0 28px 70px rgba(32, 38, 51, 0.18);
   --node-shadow: drop-shadow(0 14px 24px rgba(45, 55, 72, 0.14));
   --canvas-grid: transparent;
   --ring-guide: color-mix(in srgb, var(--focus) 28%, transparent);
-}
-
-:root[data-style="index-card"] {
-  --bg: #eceff3;
-  --surface: rgba(252, 253, 248, 0.78);
-  --surface-solid: #fffdf5;
-  --surface-raised: rgba(255, 255, 252, 0.93);
-  --surface-recessed: rgba(237, 242, 247, 0.84);
-  --glass-border: rgba(92, 103, 120, 0.22);
-  --hairline: rgba(49, 60, 74, 0.13);
-  --field: rgba(255, 255, 250, 0.92);
-  --field-hover: #ffffff;
-  --control: linear-gradient(180deg, #ffffff, rgba(234, 239, 247, 0.92));
-  --control-hover: linear-gradient(180deg, #ffffff, rgba(225, 233, 244, 0.96));
-  --control-pressed: linear-gradient(180deg, rgba(218, 226, 238, 0.96), #ffffff);
-  --control-ink: #202733;
-  --ink: #202733;
-  --muted: #697383;
-  --label: #788394;
-  --focus: #2563eb;
-  --focus-soft: rgba(37, 99, 235, 0.18);
-  --path-glow: rgba(37, 99, 235, 0.26);
-  --path-fill: rgba(37, 99, 235, 0.055);
-  --sibling-glow: rgba(245, 158, 11, 0.24);
-  --sibling-fill: rgba(245, 158, 11, 0.07);
-  --canvas-bg: #eef2f6;
-  --canvas-grid: rgba(88, 100, 116, 0.07);
-  --canvas-wash: rgba(255, 255, 255, 0.66);
-  --ring-guide: rgba(78, 91, 111, 0.28);
-  --node-fill: #fffef8;
-  --node-ink: #202733;
-  --root-node-fill: #243247;
-  --root-node-ink: #fffdf5;
-  --shadow-sm: 0 1px 1px rgba(35, 44, 59, 0.08), 0 1px 0 rgba(255, 255, 255, 0.86) inset;
-  --shadow-md: 0 10px 22px rgba(34, 45, 62, 0.13);
-  --shadow-lg: 0 24px 56px rgba(34, 45, 62, 0.18);
-  --node-shadow: drop-shadow(0 8px 10px rgba(52, 64, 84, 0.12));
-}
-
-:root[data-theme="dark"][data-style="index-card"] {
-  --bg: #14161a;
-  --surface: rgba(35, 39, 46, 0.78);
-  --surface-solid: #242831;
-  --surface-raised: rgba(44, 49, 59, 0.92);
-  --surface-recessed: rgba(22, 25, 30, 0.86);
-  --glass-border: rgba(224, 232, 244, 0.16);
-  --hairline: rgba(224, 232, 244, 0.1);
-  --field: rgba(26, 30, 36, 0.92);
-  --field-hover: rgba(35, 40, 49, 0.98);
-  --control: linear-gradient(180deg, rgba(60, 67, 80, 0.9), rgba(38, 43, 52, 0.92));
-  --control-hover: linear-gradient(180deg, rgba(72, 81, 96, 0.94), rgba(45, 51, 61, 0.98));
-  --control-pressed: linear-gradient(180deg, rgba(28, 32, 39, 0.98), rgba(58, 65, 78, 0.9));
-  --control-ink: #f4f6fa;
-  --ink: #f4f6fa;
-  --muted: #b0b8c5;
-  --label: #9ba5b4;
-  --canvas-bg: #171b21;
-  --canvas-grid: rgba(224, 232, 244, 0.055);
-  --canvas-wash: rgba(87, 103, 125, 0.2);
-  --ring-guide: rgba(224, 232, 244, 0.2);
-  --node-fill: rgba(43, 49, 59, 0.96);
-  --node-ink: #f4f6fa;
-  --root-node-fill: #f4f6fa;
-  --root-node-ink: #171b21;
-  --node-shadow: drop-shadow(0 9px 14px rgba(0, 0, 0, 0.34));
-}
-
-:root[data-style="radar"] {
-  --bg: #060b0a;
-  --surface: rgba(8, 24, 22, 0.78);
-  --surface-solid: #0b1615;
-  --surface-raised: rgba(14, 36, 33, 0.9);
-  --surface-recessed: rgba(4, 12, 12, 0.88);
-  --glass-border: rgba(64, 224, 177, 0.22);
-  --hairline: rgba(125, 249, 208, 0.13);
-  --field: rgba(4, 16, 15, 0.92);
-  --field-hover: rgba(8, 30, 27, 0.98);
-  --control: linear-gradient(180deg, rgba(19, 57, 51, 0.9), rgba(7, 26, 24, 0.94));
-  --control-hover: linear-gradient(180deg, rgba(28, 78, 68, 0.94), rgba(10, 36, 33, 0.98));
-  --control-pressed: linear-gradient(180deg, rgba(4, 15, 14, 0.98), rgba(23, 64, 57, 0.88));
-  --control-ink: #d8fff5;
-  --ink: #d8fff5;
-  --muted: #8fcfbe;
-  --label: #78b9aa;
-  --focus: #2dd4bf;
-  --focus-soft: rgba(45, 212, 191, 0.24);
-  --path-glow: rgba(45, 212, 191, 0.38);
-  --path-fill: rgba(45, 212, 191, 0.09);
-  --sibling-glow: rgba(251, 191, 36, 0.28);
-  --sibling-fill: rgba(251, 191, 36, 0.08);
-  --canvas-bg: #040908;
-  --canvas-grid: rgba(45, 212, 191, 0.08);
-  --canvas-wash: rgba(20, 184, 166, 0.14);
-  --ring-guide: rgba(45, 212, 191, 0.4);
-  --node-fill: rgba(5, 22, 21, 0.9);
-  --node-ink: #d8fff5;
-  --root-node-fill: #2dd4bf;
-  --root-node-ink: #031110;
-  --shadow-sm: 0 0 0 1px rgba(45, 212, 191, 0.12), 0 8px 18px rgba(0, 0, 0, 0.24);
-  --shadow-md: 0 16px 36px rgba(0, 0, 0, 0.34), 0 0 26px rgba(45, 212, 191, 0.08);
-  --shadow-lg: 0 30px 74px rgba(0, 0, 0, 0.5), 0 0 44px rgba(45, 212, 191, 0.1);
-  --node-shadow: drop-shadow(0 0 9px rgba(45, 212, 191, 0.28)) drop-shadow(0 10px 16px rgba(0, 0, 0, 0.34));
-}
-
-:root[data-style="kanban"] {
-  --bg: #f4f6f8;
-  --surface: rgba(255, 255, 255, 0.78);
-  --surface-solid: #ffffff;
-  --surface-raised: rgba(255, 255, 255, 0.94);
-  --surface-recessed: rgba(239, 243, 247, 0.9);
-  --glass-border: rgba(91, 103, 122, 0.2);
-  --hairline: rgba(47, 58, 74, 0.13);
-  --field: rgba(255, 255, 255, 0.92);
-  --field-hover: #ffffff;
-  --control: linear-gradient(180deg, #ffffff, rgba(234, 238, 244, 0.94));
-  --control-hover: linear-gradient(180deg, #ffffff, rgba(224, 231, 240, 0.96));
-  --control-pressed: linear-gradient(180deg, rgba(217, 225, 235, 0.96), #ffffff);
-  --control-ink: #1f2937;
-  --ink: #1f2937;
-  --muted: #667085;
-  --label: #7b8494;
-  --focus: #2563eb;
-  --focus-soft: rgba(37, 99, 235, 0.18);
-  --path-glow: rgba(37, 99, 235, 0.24);
-  --path-fill: rgba(37, 99, 235, 0.055);
-  --sibling-glow: rgba(16, 185, 129, 0.24);
-  --sibling-fill: rgba(16, 185, 129, 0.07);
-  --canvas-bg: #f6f8fb;
-  --canvas-grid: rgba(64, 76, 96, 0.055);
-  --canvas-wash: rgba(255, 255, 255, 0.68);
-  --ring-guide: rgba(95, 109, 130, 0.24);
-  --node-fill: #ffffff;
-  --node-ink: #1f2937;
-  --root-node-fill: #111827;
-  --root-node-ink: #ffffff;
-  --shadow-sm: 0 1px 2px rgba(34, 42, 58, 0.08), 0 1px 0 rgba(255, 255, 255, 0.86) inset;
-  --shadow-md: 0 8px 20px rgba(34, 42, 58, 0.12);
-  --shadow-lg: 0 20px 48px rgba(34, 42, 58, 0.16);
-  --node-shadow: drop-shadow(0 5px 8px rgba(31, 41, 55, 0.1));
-}
-
-:root[data-theme="dark"][data-style="kanban"] {
-  --bg: #121417;
-  --surface: rgba(31, 35, 41, 0.78);
-  --surface-solid: #20242b;
-  --surface-raised: rgba(40, 45, 53, 0.92);
-  --surface-recessed: rgba(20, 23, 28, 0.88);
-  --glass-border: rgba(229, 234, 242, 0.15);
-  --hairline: rgba(229, 234, 242, 0.1);
-  --field: rgba(24, 28, 34, 0.94);
-  --field-hover: rgba(32, 37, 45, 0.98);
-  --control: linear-gradient(180deg, rgba(56, 63, 75, 0.9), rgba(36, 41, 50, 0.94));
-  --control-hover: linear-gradient(180deg, rgba(69, 77, 91, 0.94), rgba(43, 49, 59, 0.98));
-  --control-pressed: linear-gradient(180deg, rgba(27, 31, 38, 0.98), rgba(55, 62, 74, 0.9));
-  --control-ink: #f6f8fb;
-  --ink: #f6f8fb;
-  --muted: #aab3c0;
-  --label: #98a3b2;
-  --canvas-bg: #15191f;
-  --canvas-grid: rgba(229, 234, 242, 0.05);
-  --canvas-wash: rgba(91, 110, 134, 0.18);
-  --ring-guide: rgba(229, 234, 242, 0.18);
-  --node-fill: rgba(39, 45, 54, 0.96);
-  --node-ink: #f6f8fb;
-  --root-node-fill: #f6f8fb;
-  --root-node-ink: #15191f;
-  --node-shadow: drop-shadow(0 7px 12px rgba(0, 0, 0, 0.3));
 }
 
 :root[data-style="schematic"] {
@@ -389,30 +277,30 @@
 }
 
 :root[data-theme="dark"][data-style="schematic"] {
-  --bg: #101817;
-  --surface: rgba(27, 40, 39, 0.78);
-  --surface-solid: #1d2a29;
-  --surface-raised: rgba(35, 51, 49, 0.92);
-  --surface-recessed: rgba(15, 24, 23, 0.88);
-  --glass-border: rgba(180, 232, 224, 0.16);
-  --hairline: rgba(180, 232, 224, 0.1);
-  --field: rgba(19, 30, 29, 0.94);
-  --field-hover: rgba(26, 42, 40, 0.98);
-  --control: linear-gradient(180deg, rgba(46, 69, 66, 0.9), rgba(28, 43, 41, 0.94));
-  --control-hover: linear-gradient(180deg, rgba(56, 84, 80, 0.94), rgba(34, 52, 50, 0.98));
-  --control-pressed: linear-gradient(180deg, rgba(17, 27, 26, 0.98), rgba(45, 68, 65, 0.9));
-  --control-ink: #eefdfa;
-  --ink: #eefdfa;
-  --muted: #a5c7c2;
-  --label: #91b4af;
-  --canvas-bg: #101b1a;
-  --canvas-grid: rgba(180, 232, 224, 0.07);
-  --canvas-wash: rgba(51, 103, 96, 0.18);
-  --ring-guide: rgba(180, 232, 224, 0.18);
-  --node-fill: rgba(31, 48, 46, 0.96);
-  --node-ink: #eefdfa;
-  --root-node-fill: #eefdfa;
-  --root-node-ink: #101b1a;
+  --bg: #0b1111;
+  --surface: rgba(17, 27, 27, 0.8);
+  --surface-solid: #142020;
+  --surface-raised: rgba(25, 39, 39, 0.92);
+  --surface-recessed: rgba(8, 15, 15, 0.9);
+  --glass-border: rgba(125, 211, 252, 0.18);
+  --hairline: rgba(125, 211, 252, 0.12);
+  --field: rgba(10, 18, 18, 0.94);
+  --field-hover: rgba(18, 31, 31, 0.98);
+  --control: linear-gradient(180deg, rgba(31, 52, 52, 0.9), rgba(16, 29, 29, 0.94));
+  --control-hover: linear-gradient(180deg, rgba(41, 69, 69, 0.94), rgba(22, 39, 39, 0.98));
+  --control-pressed: linear-gradient(180deg, rgba(7, 14, 14, 0.98), rgba(33, 57, 57, 0.9));
+  --control-ink: #e8fffb;
+  --ink: #e8fffb;
+  --muted: #a8c9c7;
+  --label: #90b4b2;
+  --canvas-bg: #0c1515;
+  --canvas-grid: rgba(125, 211, 252, 0.08);
+  --canvas-wash: rgba(56, 189, 248, 0.1);
+  --ring-guide: rgba(125, 211, 252, 0.3);
+  --node-fill: rgba(17, 29, 30, 0.96);
+  --node-ink: #e8fffb;
+  --root-node-fill: #7dd3fc;
+  --root-node-ink: #061112;
   --node-shadow: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.28));
 }
 
@@ -466,32 +354,8 @@ body {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
-:root[data-style="radar"] body,
 :root[data-style="schematic"] body {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-}
-
-:root[data-style="index-card"] body {
-  background:
-    radial-gradient(circle at 22% -10%, var(--canvas-wash), transparent 30rem),
-    radial-gradient(circle at 78% 8%, color-mix(in srgb, var(--focus) 10%, transparent), transparent 28rem),
-    linear-gradient(115deg, color-mix(in srgb, var(--root-node-fill) 6%, transparent), transparent 36rem),
-    var(--bg);
-}
-
-:root[data-style="radar"] body {
-  background:
-    radial-gradient(circle at 50% -16%, color-mix(in srgb, var(--focus) 18%, transparent), transparent 34rem),
-    radial-gradient(circle at 78% 10%, color-mix(in srgb, var(--root-node-fill) 10%, transparent), transparent 28rem),
-    var(--bg);
-}
-
-:root[data-style="kanban"] body {
-  background:
-    radial-gradient(circle at 20% -8%, var(--canvas-wash), transparent 30rem),
-    radial-gradient(circle at 86% 4%, color-mix(in srgb, var(--focus) 9%, transparent), transparent 28rem),
-    linear-gradient(120deg, color-mix(in srgb, var(--root-node-fill) 6%, transparent), transparent 42rem),
-    var(--bg);
 }
 
 :root[data-style="schematic"] body {
@@ -500,6 +364,116 @@ body {
     radial-gradient(circle at 82% 8%, color-mix(in srgb, var(--focus) 10%, transparent), transparent 30rem),
     linear-gradient(135deg, color-mix(in srgb, var(--root-node-fill) 6%, transparent), transparent 38rem),
     var(--bg);
+}
+
+:root[data-style="print"] .toolbar,
+:root[data-style="print"] .toolbar-group,
+:root[data-style="print"] .settings-panel,
+:root[data-style="print"] .command-panel,
+:root[data-style="print"] .theme-controls,
+:root[data-style="print"] .spacing-controls,
+:root[data-style="print"] .note-sidebar,
+:root[data-style="print"] .node-action-bar,
+:root[data-style="print"] .custom-select-list,
+:root[data-style="print"] .layout-settings-panel {
+  border-radius: 0;
+  background: var(--surface-solid);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-style="print"] button,
+:root[data-style="print"] .custom-select-button,
+:root[data-style="print"] .import-mind,
+:root[data-style="print"] .import-theme {
+  border-radius: 0;
+  background: var(--control);
+  box-shadow: none;
+}
+
+:root[data-style="papery"] .toolbar,
+:root[data-style="papery"] .toolbar-group,
+:root[data-style="papery"] .settings-panel,
+:root[data-style="papery"] .command-panel,
+:root[data-style="papery"] .theme-controls,
+:root[data-style="papery"] .spacing-controls,
+:root[data-style="papery"] .note-sidebar,
+:root[data-style="papery"] .node-action-bar,
+:root[data-style="papery"] .custom-select-list,
+:root[data-style="papery"] .layout-settings-panel {
+  background:
+    repeating-linear-gradient(14deg, rgba(110, 88, 49, 0.028) 0 1px, transparent 1px 8px),
+    var(--surface-raised);
+}
+
+:root[data-style="blueprint"] .toolbar,
+:root[data-style="blueprint"] .toolbar-group,
+:root[data-style="blueprint"] .settings-panel,
+:root[data-style="blueprint"] .command-panel,
+:root[data-style="blueprint"] .theme-controls,
+:root[data-style="blueprint"] .spacing-controls,
+:root[data-style="blueprint"] .note-sidebar,
+:root[data-style="blueprint"] .node-action-bar,
+:root[data-style="blueprint"] .custom-select-list,
+:root[data-style="blueprint"] .layout-settings-panel {
+  border-color: rgba(125, 211, 252, 0.32);
+  background:
+    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
+    color-mix(in srgb, var(--surface-raised) 92%, transparent);
+  background-size: 18px 18px, 18px 18px, auto;
+  box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.04) inset, 0 18px 46px rgba(0, 0, 0, 0.34);
+}
+
+:root[data-style="terminal"] .toolbar,
+:root[data-style="terminal"] .toolbar-group,
+:root[data-style="terminal"] .settings-panel,
+:root[data-style="terminal"] .command-panel,
+:root[data-style="terminal"] .theme-controls,
+:root[data-style="terminal"] .spacing-controls,
+:root[data-style="terminal"] .note-sidebar,
+:root[data-style="terminal"] .node-action-bar,
+:root[data-style="terminal"] .custom-select-list,
+:root[data-style="terminal"] .layout-settings-panel {
+  border-color: rgba(34, 197, 94, 0.26);
+  background:
+    linear-gradient(rgba(34, 197, 94, 0.035) 1px, transparent 1px),
+    color-mix(in srgb, var(--surface-raised) 94%, transparent);
+  background-size: auto 6px, auto;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.05) inset, 0 0 24px rgba(34, 197, 94, 0.08), 0 18px 46px rgba(0, 0, 0, 0.42);
+}
+
+:root[data-style="blueprint"] button,
+:root[data-style="blueprint"] .custom-select-button,
+:root[data-style="blueprint"] .import-mind,
+:root[data-style="blueprint"] .import-theme,
+:root[data-style="terminal"] button,
+:root[data-style="terminal"] .custom-select-button,
+:root[data-style="terminal"] .import-mind,
+:root[data-style="terminal"] .import-theme {
+  border-color: color-mix(in srgb, var(--focus) 28%, var(--glass-border));
+  text-transform: uppercase;
+}
+
+:root[data-style="soft"] .toolbar,
+:root[data-style="soft"] .toolbar-group,
+:root[data-style="soft"] .settings-panel,
+:root[data-style="soft"] .command-panel,
+:root[data-style="soft"] .theme-controls,
+:root[data-style="soft"] .spacing-controls,
+:root[data-style="soft"] .note-sidebar,
+:root[data-style="soft"] .node-action-bar,
+:root[data-style="soft"] .custom-select-list,
+:root[data-style="soft"] .layout-settings-panel {
+  border-radius: 22px;
+}
+
+:root[data-style="soft"] button,
+:root[data-style="soft"] .custom-select-button,
+:root[data-style="soft"] .import-mind,
+:root[data-style="soft"] .import-theme {
+  border-radius: 999px;
 }
 
 button,
@@ -631,6 +605,31 @@ summary,
   from { opacity: 0.86; }
   to { opacity: 1; }
 }
+
+@keyframes spiritsDrift {
+  0% {
+    background-position: 0% 40%, 100% 10%, 40% 90%, 0 0, 0 0, 0 0;
+  }
+  50% {
+    background-position: 42% 25%, 58% 38%, 62% 66%, 0 0, 0 0, 0 0;
+  }
+  100% {
+    background-position: 0% 40%, 100% 10%, 40% 90%, 0 0, 0 0, 0 0;
+  }
+}
+
+@keyframes wavesFlow {
+  0% {
+    transform: translate3d(-3%, -1%, 0) scaleX(1.08) scaleY(1);
+  }
+  50% {
+    transform: translate3d(3%, 1.5%, 0) scaleX(1.16) scaleY(1.04);
+  }
+  100% {
+    transform: translate3d(-3%, -1%, 0) scaleX(1.08) scaleY(1);
+  }
+}
+
 
 button:focus-visible,
 select:focus-visible,
@@ -1160,6 +1159,118 @@ button:disabled:hover {
   box-shadow: var(--shadow-sm);
 }
 
+select.native-select-hidden {
+  display: none;
+}
+
+.custom-select {
+  position: relative;
+  min-width: 0;
+}
+
+.map-field .custom-select {
+  width: clamp(150px, 18vw, 245px);
+}
+
+.node-meta-grid .custom-select {
+  width: 100%;
+}
+
+.node-meta-grid .custom-select-button {
+  min-height: 32px;
+  border-radius: 10px;
+}
+
+.custom-select-button {
+  position: relative;
+  width: 100%;
+  min-height: 30px;
+  overflow: hidden;
+  justify-content: space-between;
+  padding: 0 30px 0 10px;
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  text-overflow: ellipsis;
+  box-shadow: var(--shadow-sm);
+}
+
+.custom-select-button::after {
+  content: "⌄";
+  position: absolute;
+  right: 10px;
+  color: var(--label);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.custom-select.is-open .custom-select-button {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 4px var(--focus-soft), var(--shadow-sm);
+}
+
+.custom-select-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 8;
+  display: grid;
+  gap: 3px;
+  width: min(230px, 72vw);
+  max-height: 280px;
+  overflow: auto;
+  padding: 7px;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-raised) 96%, transparent);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+}
+
+.custom-select-list[hidden] {
+  display: none;
+}
+
+.custom-select-group {
+  padding: 6px 7px 2px;
+  color: var(--label);
+  font-size: 10px;
+  font-weight: 820;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.custom-select-option {
+  width: 100%;
+  min-height: 28px;
+  justify-content: flex-start;
+  padding: 0 8px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 650;
+  text-align: left;
+  box-shadow: none;
+}
+
+.custom-select-option:hover,
+.custom-select-option:focus-visible {
+  border-color: var(--hairline);
+  background: color-mix(in srgb, var(--field-hover) 82%, var(--focus) 18%);
+  box-shadow: none;
+}
+
+.custom-select-option[aria-selected="true"] {
+  border-color: color-mix(in srgb, var(--focus) 36%, var(--hairline));
+  background: var(--focus-soft);
+  color: var(--ink);
+}
+
 .theme-label {
   display: block;
   margin-bottom: 7px;
@@ -1216,6 +1327,16 @@ button:disabled:hover {
   min-height: 30px;
 }
 
+.background-upload {
+  width: 100%;
+  min-height: 32px;
+  justify-content: center;
+}
+
+.background-upload[hidden] {
+  display: none;
+}
+
 .theme-actions button::before,
 .theme-actions .import-theme::before {
   content: attr(data-icon);
@@ -1253,6 +1374,47 @@ button:disabled:hover {
   padding: 0 8px;
 }
 
+.layout-settings-dropdown {
+  position: relative;
+}
+
+.layout-settings-dropdown .custom-select-button {
+  width: 100%;
+}
+
+.layout-settings-dropdown.is-open .custom-select-button {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 4px var(--focus-soft), var(--shadow-sm);
+}
+
+.layout-settings-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 8;
+  display: grid;
+  gap: 9px;
+  width: min(360px, 78vw);
+  padding: 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-raised) 96%, transparent);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+}
+
+.layout-settings-panel[hidden] {
+  display: none;
+}
+
+.layout-settings-summary {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 780;
+  line-height: 1;
+}
+
 .spacing-controls label,
 .range-field {
   display: grid;
@@ -1262,6 +1424,10 @@ button:disabled:hover {
   color: var(--label);
   font-size: 12px;
   font-weight: 650;
+}
+
+.range-field[hidden] {
+  display: none;
 }
 
 .spacing-controls input[type="number"] {
@@ -1323,6 +1489,17 @@ button:disabled:hover {
   min-height: 0;
   overflow: hidden;
   position: relative;
+  background: var(--canvas-bg);
+}
+
+.canvas-wrap::before {
+  content: "";
+  position: absolute;
+  inset: -28%;
+  z-index: 2;
+  display: none;
+  pointer-events: none;
+  will-change: transform;
 }
 
 .path-trail {
@@ -1623,7 +1800,8 @@ button:disabled:hover {
 
 .command-palette,
 .shortcut-sheet,
-.welcome-dialog {
+.welcome-dialog,
+.recovery-dialog {
   position: fixed;
   inset: 0;
   z-index: 20;
@@ -1639,13 +1817,15 @@ button:disabled:hover {
 
 .command-palette[hidden],
 .shortcut-sheet[hidden],
-.welcome-dialog[hidden] {
+.welcome-dialog[hidden],
+.recovery-dialog[hidden] {
   display: none;
 }
 
 .palette-panel,
 .shortcut-panel,
-.welcome-panel {
+.welcome-panel,
+.recovery-panel {
   width: min(620px, calc(100vw - 28px));
   overflow: hidden;
   border: 1px solid var(--glass-border);
@@ -1659,6 +1839,11 @@ button:disabled:hover {
 }
 
 .welcome-dialog {
+  align-items: center;
+  padding: 24px;
+}
+
+.recovery-dialog {
   align-items: center;
   padding: 24px;
 }
@@ -1716,6 +1901,100 @@ button:disabled:hover {
   max-height: min(86vh, 640px);
   padding: 26px;
   overflow: auto;
+}
+
+.recovery-panel {
+  display: grid;
+  gap: 14px;
+  width: min(560px, calc(100vw - 28px));
+  max-height: min(82vh, 620px);
+  padding: 18px;
+  overflow: auto;
+}
+
+.recovery-head,
+.recovery-current,
+.recovery-actions,
+.recovery-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.recovery-head h2 {
+  margin: 2px 0 0;
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.recovery-current {
+  padding: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--field) 72%, transparent);
+}
+
+.recovery-current div,
+.recovery-item > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.recovery-current span,
+.recovery-item span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.recovery-current output {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.recovery-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.recovery-list {
+  display: grid;
+  gap: 8px;
+}
+
+.recovery-list > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.recovery-item {
+  padding: 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-solid) 72%, transparent);
+}
+
+.recovery-item strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recovery-item > div:last-child {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.recovery-item button {
+  min-height: 30px;
+  padding: 0 10px;
 }
 
 .welcome-head {
@@ -1884,6 +2163,8 @@ button:disabled:hover {
 }
 
 #chartCanvas {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   min-height: 560px;
@@ -1954,38 +2235,6 @@ button:disabled:hover {
     var(--canvas-bg);
 }
 
-:root[data-style="index-card"] #chartCanvas {
-  background:
-    linear-gradient(color-mix(in srgb, var(--focus) 9%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--focus) 9%, transparent) 1px, transparent 1px),
-    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
-    radial-gradient(circle at 48% 42%, var(--canvas-wash), transparent 36rem),
-    var(--canvas-bg);
-  background-size: 12px 12px, 12px 12px, 96px 96px, 96px 96px, auto, auto;
-}
-
-:root[data-style="radar"] #chartCanvas {
-  background:
-    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--focus) 22%, transparent) 0 1px, transparent 2px 9rem, color-mix(in srgb, var(--focus) 16%, transparent) 9.05rem 9.12rem, transparent 9.18rem 18rem, color-mix(in srgb, var(--focus) 13%, transparent) 18.05rem 18.12rem, transparent 18.18rem),
-    conic-gradient(from -90deg at 50% 50%, transparent 0deg, color-mix(in srgb, var(--focus) 30%, transparent) 2deg, transparent 7deg, transparent 90deg, color-mix(in srgb, var(--root-node-fill) 18%, transparent) 92deg, transparent 96deg, transparent 180deg, color-mix(in srgb, var(--focus) 22%, transparent) 182deg, transparent 187deg, transparent 270deg, color-mix(in srgb, var(--root-node-fill) 16%, transparent) 272deg, transparent 276deg, transparent 360deg),
-    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
-    radial-gradient(circle at 50% 50%, var(--canvas-wash), transparent 38rem),
-    var(--canvas-bg);
-  background-size: auto, auto, 40px 40px, 40px 40px, auto, auto;
-}
-
-:root[data-style="kanban"] #chartCanvas {
-  background:
-    linear-gradient(90deg, transparent 0 calc(33.333% - 1px), var(--hairline) calc(33.333% - 1px) calc(33.333% + 1px), transparent calc(33.333% + 1px) calc(66.666% - 1px), var(--hairline) calc(66.666% - 1px) calc(66.666% + 1px), transparent calc(66.666% + 1px)),
-    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
-    radial-gradient(circle at 50% 40%, var(--canvas-wash), transparent 34rem),
-    var(--canvas-bg);
-  background-size: auto, 36px 36px, 36px 36px, auto, auto;
-}
-
 :root[data-style="schematic"] #chartCanvas {
   background:
     linear-gradient(color-mix(in srgb, var(--focus) 16%, transparent) 1px, transparent 1px),
@@ -1997,25 +2246,6 @@ button:disabled:hover {
   background-size: 16px 16px, 16px 16px, 80px 80px, 80px 80px, auto, auto;
 }
 
-:root[data-theme="dark"][data-style="index-card"] #chartCanvas {
-  background:
-    linear-gradient(color-mix(in srgb, var(--focus) 8%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--focus) 8%, transparent) 1px, transparent 1px),
-    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
-    radial-gradient(circle at 48% 42%, var(--canvas-wash), transparent 36rem),
-    var(--canvas-bg);
-}
-
-:root[data-theme="dark"][data-style="kanban"] #chartCanvas {
-  background:
-    linear-gradient(90deg, transparent 0 calc(33.333% - 1px), var(--hairline) calc(33.333% - 1px) calc(33.333% + 1px), transparent calc(33.333% + 1px) calc(66.666% - 1px), var(--hairline) calc(66.666% - 1px) calc(66.666% + 1px), transparent calc(66.666% + 1px)),
-    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
-    radial-gradient(circle at 50% 40%, var(--canvas-wash), transparent 34rem),
-    var(--canvas-bg);
-}
-
 :root[data-theme="dark"][data-style="schematic"] #chartCanvas {
   background:
     linear-gradient(color-mix(in srgb, var(--focus) 14%, transparent) 1px, transparent 1px),
@@ -2024,6 +2254,69 @@ button:disabled:hover {
     linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
     radial-gradient(circle at 50% 42%, var(--canvas-wash), transparent 34rem),
     var(--canvas-bg);
+}
+
+:root[data-background="spirits"] #chartCanvas {
+  background:
+    radial-gradient(ellipse at 18% 24%, rgba(34, 211, 238, 0.22), transparent 34rem),
+    radial-gradient(ellipse at 78% 16%, rgba(168, 85, 247, 0.2), transparent 36rem),
+    radial-gradient(ellipse at 54% 76%, rgba(74, 222, 128, 0.18), transparent 38rem),
+    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
+    var(--canvas-bg);
+  background-size: 90rem 48rem, 86rem 52rem, 80rem 44rem, 48px 48px, 48px 48px, auto;
+  animation: spiritsDrift 18s ease-in-out infinite;
+}
+
+:root[data-theme="dark"][data-background="spirits"] #chartCanvas {
+  background:
+    radial-gradient(ellipse at 18% 24%, rgba(34, 211, 238, 0.3), transparent 34rem),
+    radial-gradient(ellipse at 78% 16%, rgba(168, 85, 247, 0.28), transparent 36rem),
+    radial-gradient(ellipse at 54% 76%, rgba(74, 222, 128, 0.24), transparent 38rem),
+    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
+    var(--canvas-bg);
+  background-size: 90rem 48rem, 86rem 52rem, 80rem 44rem, 48px 48px, 48px 48px, auto;
+}
+
+:root[data-background="waves"] .canvas-wrap::before {
+  display: block;
+  background:
+    radial-gradient(ellipse 92% 9% at 18% 43%, transparent 0 10%, rgba(125, 211, 252, 0.12) 28%, rgba(125, 211, 252, 0.34) 45%, rgba(125, 211, 252, 0.16) 60%, transparent 84%),
+    radial-gradient(ellipse 104% 11% at 68% 54%, transparent 0 12%, rgba(255, 255, 255, 0.16) 30%, rgba(255, 255, 255, 0.34) 42%, rgba(99, 102, 241, 0.25) 60%, transparent 86%),
+    radial-gradient(ellipse 88% 8% at 38% 64%, transparent 0 10%, rgba(14, 165, 233, 0.12) 30%, rgba(14, 165, 233, 0.32) 46%, rgba(14, 165, 233, 0.16) 62%, transparent 86%);
+  filter: blur(8px);
+  opacity: 0.72;
+  mix-blend-mode: screen;
+  animation: wavesFlow 26s ease-in-out infinite;
+}
+
+:root[data-theme="dark"][data-background="waves"] .canvas-wrap::before {
+  background:
+    radial-gradient(ellipse 92% 9% at 18% 43%, transparent 0 10%, rgba(125, 211, 252, 0.14) 28%, rgba(125, 211, 252, 0.44) 45%, rgba(125, 211, 252, 0.2) 60%, transparent 84%),
+    radial-gradient(ellipse 104% 11% at 68% 54%, transparent 0 12%, rgba(255, 255, 255, 0.18) 30%, rgba(255, 255, 255, 0.38) 42%, rgba(99, 102, 241, 0.34) 60%, transparent 86%),
+    radial-gradient(ellipse 88% 8% at 38% 64%, transparent 0 10%, rgba(14, 165, 233, 0.16) 30%, rgba(14, 165, 233, 0.4) 46%, rgba(14, 165, 233, 0.22) 62%, transparent 86%);
+  opacity: 0.9;
+}
+
+:root[data-background="waves"] #chartCanvas {
+  background:
+    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
+    transparent;
+  background-size: 48px 48px, 48px 48px, auto;
+}
+
+:root[data-background="image"] #chartCanvas {
+  background:
+    linear-gradient(color-mix(in srgb, var(--canvas-bg) 24%, transparent), color-mix(in srgb, var(--canvas-bg) 24%, transparent)),
+    var(--background-image-url),
+    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
+    var(--canvas-bg);
+  background-position: center, center, 0 0, 0 0, 0 0;
+  background-repeat: no-repeat, no-repeat, repeat, repeat, repeat;
+  background-size: cover, cover, 48px 48px, 48px 48px, auto;
 }
 
 #chartCanvas.map-fade {
@@ -2059,24 +2352,6 @@ button:disabled:hover {
   opacity: 0.5;
 }
 
-:root[data-style="index-card"] .edge {
-  stroke-width: 2;
-  stroke-dasharray: 2 7;
-  opacity: 0.64;
-}
-
-:root[data-style="radar"] .edge {
-  stroke-width: 1.55;
-  stroke-dasharray: 6 6;
-  opacity: 0.78;
-  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--focus) 28%, transparent));
-}
-
-:root[data-style="kanban"] .edge {
-  stroke-width: 1.8;
-  opacity: 0.58;
-}
-
 :root[data-style="schematic"] .edge {
   stroke-width: 1.45;
   stroke-linecap: square;
@@ -2087,11 +2362,6 @@ button:disabled:hover {
   stroke-width: 4.8;
   opacity: 0.9;
   filter: saturate(1.65) drop-shadow(0 1px 3px rgba(20, 24, 32, 0.18));
-}
-
-:root[data-style="radar"] .edge.path-edge {
-  stroke-width: 3.2;
-  filter: saturate(1.5) drop-shadow(0 0 8px color-mix(in srgb, var(--focus) 42%, transparent));
 }
 
 :root[data-style="schematic"] .edge.path-edge {
@@ -2179,41 +2449,11 @@ button:disabled:hover {
   opacity: 0.12;
 }
 
-:root[data-style="index-card"] .ring-guide {
-  stroke: var(--ring-guide);
-  stroke-width: 1;
-  stroke-dasharray: 3 10;
-  opacity: 0.28;
-}
-
-:root[data-style="radar"] .ring-guide {
-  stroke: var(--ring-guide);
-  stroke-width: 1.2;
-  stroke-dasharray: 2 8;
-  opacity: 0.54;
-  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--focus) 30%, transparent));
-}
-
-:root[data-style="kanban"] .ring-guide {
-  stroke: var(--ring-guide);
-  stroke-width: 1;
-  stroke-dasharray: 8 14;
-  opacity: 0.2;
-}
-
 :root[data-style="schematic"] .ring-guide {
   stroke: var(--ring-guide);
   stroke-width: 1;
   stroke-dasharray: 1 7;
   opacity: 0.26;
-}
-
-:root[data-theme="dark"][data-style="index-card"] .ring-guide {
-  stroke: var(--ring-guide);
-}
-
-:root[data-theme="dark"][data-style="kanban"] .ring-guide {
-  stroke: var(--ring-guide);
 }
 
 :root[data-theme="dark"][data-style="schematic"] .ring-guide {
@@ -2250,24 +2490,10 @@ button:disabled:hover {
   ry: 16;
 }
 
-:root[data-style="index-card"] .node .node-box,
-:root[data-style="index-card"] .node .texture-fill {
-  rx: 4;
-  ry: 4;
-}
-
-:root[data-style="radar"] .node .node-box,
-:root[data-style="radar"] .node .texture-fill,
 :root[data-style="schematic"] .node .node-box,
 :root[data-style="schematic"] .node .texture-fill {
   rx: 1;
   ry: 1;
-}
-
-:root[data-style="kanban"] .node .node-box,
-:root[data-style="kanban"] .node .texture-fill {
-  rx: 6;
-  ry: 6;
 }
 
 :root[data-style="papery"] .node .node-box {
@@ -2278,37 +2504,6 @@ button:disabled:hover {
 :root[data-style="papery"] .node .texture-fill {
   opacity: 0.18;
   mix-blend-mode: multiply;
-}
-
-:root[data-style="index-card"] .node .node-box {
-  fill: var(--node-fill);
-  stroke-width: 1.15;
-}
-
-:root[data-style="index-card"] .node .texture-fill {
-  fill: var(--node-fill);
-  opacity: 0.1;
-}
-
-:root[data-style="radar"] .node .node-box {
-  fill: var(--node-fill);
-  stroke-width: 1.3;
-}
-
-:root[data-style="radar"] .node .texture-fill {
-  fill: var(--node-fill);
-  opacity: 0.2;
-  mix-blend-mode: screen;
-}
-
-:root[data-style="kanban"] .node .node-box {
-  fill: var(--node-fill);
-  stroke-width: 1;
-}
-
-:root[data-style="kanban"] .node .texture-fill {
-  fill: var(--node-fill);
-  opacity: 0.08;
 }
 
 :root[data-style="schematic"] .node .node-box {
@@ -2322,37 +2517,7 @@ button:disabled:hover {
   mix-blend-mode: multiply;
 }
 
-:root[data-style="index-card"] .node.depth-0 .node-box {
-  fill: var(--root-node-fill);
-}
-
-:root[data-style="radar"] .node.depth-0 .node-box {
-  fill: var(--root-node-fill);
-}
-
-:root[data-style="kanban"] .node.depth-0 .node-box {
-  fill: var(--root-node-fill);
-}
-
 :root[data-style="schematic"] .node.depth-0 .node-box {
-  fill: var(--root-node-fill);
-}
-
-:root[data-theme="dark"][data-style="index-card"] .node .node-box,
-:root[data-theme="dark"][data-style="index-card"] .node .texture-fill {
-  fill: var(--node-fill);
-}
-
-:root[data-theme="dark"][data-style="index-card"] .node.depth-0 .node-box {
-  fill: var(--root-node-fill);
-}
-
-:root[data-theme="dark"][data-style="kanban"] .node .node-box,
-:root[data-theme="dark"][data-style="kanban"] .node .texture-fill {
-  fill: var(--node-fill);
-}
-
-:root[data-theme="dark"][data-style="kanban"] .node.depth-0 .node-box {
   fill: var(--root-node-fill);
 }
 
@@ -2443,17 +2608,8 @@ button:disabled:hover {
   stroke: var(--root-node-fill);
 }
 
-:root[data-style="radar"] .node .map-marker,
-:root[data-style="radar"] .node .note-marker {
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--focus) 38%, transparent));
-}
-
 :root[data-style="schematic"] .node .map-marker {
   stroke-dasharray: 5 3;
-}
-
-:root[data-style="kanban"] .node .priority-marker {
-  font-size: 13px;
 }
 
 .node .texture-fill {
@@ -2477,7 +2633,6 @@ button:disabled:hover {
   letter-spacing: 0;
 }
 
-:root[data-style="radar"] .node text,
 :root[data-style="schematic"] .node text {
   fill: var(--node-ink);
   font-weight: 750;
@@ -2487,36 +2642,7 @@ button:disabled:hover {
   fill: var(--node-ink);
 }
 
-:root[data-style="kanban"] .node text {
-  fill: var(--node-ink);
-  font-weight: 650;
-}
-
-:root[data-style="index-card"] .node text {
-  fill: var(--node-ink);
-}
-
-:root[data-style="index-card"] .node.depth-0 .node-label,
-:root[data-style="kanban"] .node.depth-0 .node-label,
 :root[data-style="schematic"] .node.depth-0 .node-label {
-  fill: var(--root-node-ink);
-}
-
-:root[data-style="radar"] .node.depth-0 .node-label {
-  fill: var(--root-node-ink);
-}
-
-:root[data-theme="dark"][data-style="index-card"] .node text,
-:root[data-theme="dark"][data-style="kanban"] .node text,
-:root[data-theme="dark"][data-style="schematic"] .node text {
-  fill: var(--node-ink);
-}
-
-:root[data-theme="dark"][data-style="index-card"] .node.depth-0 .node-label {
-  fill: var(--root-node-ink);
-}
-
-:root[data-theme="dark"][data-style="kanban"] .node.depth-0 .node-label {
   fill: var(--root-node-ink);
 }
 
@@ -2597,6 +2723,84 @@ button:disabled:hover {
 
 .node.view-book.role-note .node-box {
   stroke-dasharray: 4 3;
+}
+
+:root[data-view="document"] .edge,
+:root[data-view="document"] .pencil-edge,
+:root[data-view="document"] .ring-guide {
+  display: none;
+}
+
+:root[data-view="document"] #chartCanvas {
+  background:
+    linear-gradient(90deg, transparent calc(50% - 430px), color-mix(in srgb, var(--surface-solid) 82%, var(--canvas-bg)) calc(50% - 430px) calc(50% + 430px), transparent calc(50% + 430px)),
+    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
+    var(--canvas-bg);
+  background-size: auto, 48px 48px, 48px 48px, auto;
+}
+
+.node.view-document {
+  filter: none;
+}
+
+.node.view-document text {
+  text-anchor: start;
+}
+
+.node.view-document .node-box {
+  fill: color-mix(in srgb, var(--surface-solid) 84%, transparent);
+  stroke: color-mix(in srgb, var(--hairline) 80%, transparent);
+  stroke-width: 1;
+  rx: 0;
+  ry: 0;
+}
+
+.node.view-document.role-doc-title .node-box {
+  fill: color-mix(in srgb, var(--surface-solid) 92%, transparent);
+  stroke-width: 1.5;
+}
+
+.node.view-document.role-doc-title .node-label {
+  fill: var(--ink);
+  font-size: calc(var(--node-font-size) + 13px);
+  font-weight: 960;
+}
+
+.node.view-document.role-section .node-label {
+  fill: var(--ink);
+  font-size: calc(var(--node-font-size) + 7px);
+  font-weight: 920;
+}
+
+.node.view-document.role-subsection .node-label {
+  fill: var(--ink);
+  font-size: calc(var(--node-font-size) + 4px);
+  font-weight: 850;
+}
+
+.node.view-document.role-subsubsection .node-label {
+  fill: var(--ink);
+  font-size: calc(var(--node-font-size) + 1px);
+  font-weight: 780;
+}
+
+.node.view-document .node-note-preview {
+  fill: var(--muted);
+  font-size: max(10px, calc(var(--node-font-size) - 1px));
+  font-weight: 520;
+}
+
+.node.view-document .markdown-code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-weight: 700;
+}
+
+.node.view-document .markdown-link {
+  text-decoration: underline;
+  text-decoration-thickness: 1.2px;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 .node .leaf-marker {
@@ -2734,6 +2938,7 @@ button:disabled:hover {
   }
 
   .map-field select,
+  .map-field .custom-select,
   .title-field input,
   .node-field input,
   .node-action-bar button,
@@ -2832,6 +3037,12 @@ button:disabled:hover {
     grid-template-columns: 1fr;
   }
 
+  .layout-settings-panel {
+    position: static;
+    width: 100%;
+    margin-top: 6px;
+  }
+
   .range-field {
     grid-template-columns: 1fr 58px;
   }
@@ -2911,5 +3122,31 @@ button:disabled:hover {
 
   .welcome-actions {
     flex-direction: column;
+  }
+
+  .recovery-panel {
+    width: calc(100vw - 18px);
+    max-height: min(82vh, 620px);
+    padding: 14px;
+  }
+
+  .recovery-current,
+  .recovery-item {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .recovery-current button,
+  .recovery-actions button,
+  .recovery-item button {
+    width: 100%;
+  }
+
+  .recovery-item > div:last-child {
+    width: 100%;
+  }
+
+  .recovery-item > div:last-child button {
+    flex: 1;
   }
 }

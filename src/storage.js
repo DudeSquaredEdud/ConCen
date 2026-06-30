@@ -70,6 +70,8 @@
       appearance[key] = utils.clampNumber(input[key], limits.min, limits.max, fallback[key]);
     });
     appearance.stylePreset = normalizeStylePreset(input && input.stylePreset);
+    appearance.backgroundEffect = normalizeBackgroundEffect(input && input.backgroundEffect);
+    appearance.backgroundImageData = normalizeBackgroundImageData(input && input.backgroundImageData);
     appearance.navigationMode = normalizeNavigationMode(input && input.navigationMode);
     appearance.showStatusMarkers = input && typeof input.showStatusMarkers === "boolean" ? input.showStatusMarkers : fallback.showStatusMarkers !== false;
     appearance.showPriorityMarkers = input && typeof input.showPriorityMarkers === "boolean" ? input.showPriorityMarkers : fallback.showPriorityMarkers !== false;
@@ -187,12 +189,27 @@
 
   function normalizeTheme(value) {
     const theme = String(value || "light");
+    if (config.themeAliases && config.themeAliases[theme]) return config.themeAliases[theme];
     return config.themePresets[theme] ? theme : "light";
   }
 
   function normalizeStylePreset(value) {
     const style = String(value || config.appearanceDefaults.stylePreset || "glass");
+    if (config.styleAliases && config.styleAliases[style]) return config.styleAliases[style];
     return config.stylePresets[style] ? style : "glass";
+  }
+
+  function normalizeBackgroundEffect(value) {
+    const effect = String(value || config.appearanceDefaults.backgroundEffect || "none");
+    if (config.backgroundEffectAliases && config.backgroundEffectAliases[effect]) return config.backgroundEffectAliases[effect];
+    return config.backgroundEffects && config.backgroundEffects[effect] ? effect : "none";
+  }
+
+  function normalizeBackgroundImageData(value) {
+    const data = String(value || "");
+    if (!data) return "";
+    if (data.length > config.backgroundImageMaxDataUrlLength) return "";
+    return /^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(data) ? data : "";
   }
 
   function normalizeNavigationMode(value) {
@@ -203,7 +220,7 @@
 
   function normalizeViewMode(value, fallback) {
     const mode = String(value || fallback || "radial");
-    return ["tree", "radial", "book"].includes(mode) ? mode : "radial";
+    return ["tree", "radial", "book", "document"].includes(mode) ? mode : "radial";
   }
 
   function normalizeBranchColors(input) {
@@ -246,6 +263,8 @@
     normalizeAppearance,
     normalizeTheme,
     normalizeStylePreset,
+    normalizeBackgroundEffect,
+    normalizeBackgroundImageData,
     normalizeNavigationMode,
     normalizeBranchColors,
     normalizeCustomTheme

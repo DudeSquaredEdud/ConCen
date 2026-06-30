@@ -15,6 +15,7 @@
     },
     storageKey: "ring-map-chart-v3",
     recentMindsKey: "ring-map-chart-recent-minds-v1",
+    backgroundImageMaxDataUrlLength: 1500000,
     layout: {
       minViewportWidth: 900,
       minViewportHeight: 560,
@@ -36,26 +37,59 @@
       leafWeight: 1.35,
       overlapPadding: 18,
       overlapResolvePasses: 36,
+      maxOverlapResolveNodes: 420,
+      maxDetailedEdgeNodes: 420,
       overlapMinNudge: 10,
       overlapStagger: 18
     },
     spacingDefaults: {
-      treeLevelGap: 82,
-      treeLeafGap: 110,
-      ringBaseRadius: 110,
-      ringDepthGap: 100,
-      ringNodeGap: 28
+      treeLevelGap: 72,
+      treeLeafGap: 92,
+      ringBaseRadius: 102,
+      ringDepthGap: 90,
+      ringNodeGap: 20
     },
     spacingLimits: {
       treeLevelGap: { min: 40, max: 260 },
-      treeLeafGap: { min: 60, max: 360 },
-      ringBaseRadius: { min: 60, max: 500 },
-      ringDepthGap: { min: 60, max: 500 },
+      treeLeafGap: { min: 32, max: 360 },
+      ringBaseRadius: { min: 40, max: 500 },
+      ringDepthGap: { min: 40, max: 500 },
       ringNodeGap: { min: 0, max: 200 }
+    },
+    layoutModeControls: {
+      tree: {
+        label: "Flat",
+        controls: {
+          treeLevelGap: "Layer spacing",
+          treeLeafGap: "Column spacing"
+        }
+      },
+      radial: {
+        label: "Radial",
+        controls: {
+          ringBaseRadius: "Center radius",
+          ringDepthGap: "Ring spacing",
+          ringNodeGap: "Node spacing"
+        }
+      },
+      book: {
+        label: "Tree",
+        controls: {
+          treeLevelGap: "Row spacing",
+          treeLeafGap: "Column spacing"
+        }
+      },
+      document: {
+        label: "Book",
+        controls: {
+          treeLevelGap: "Paragraph spacing"
+        }
+      }
     },
     appearanceDefaults: {
       nodeFontSize: 13,
       stylePreset: "glass",
+      backgroundEffect: "none",
       navigationMode: "outline",
       showStatusMarkers: false,
       showPriorityMarkers: true
@@ -70,10 +104,27 @@
       blueprint: { label: "Blueprint" },
       terminal: { label: "Terminal" },
       soft: { label: "Soft" },
-      "index-card": { label: "Index Card" },
-      radar: { label: "Radar" },
-      kanban: { label: "Kanban" },
       schematic: { label: "Schematic" }
+    },
+    styleAliases: {
+      "index-card": "papery",
+      radar: "terminal",
+      kanban: "schematic"
+    },
+    styleGroups: {
+      core: { label: "Core", variants: ["glass", "soft", "print"] },
+      texture: { label: "Texture", variants: ["papery"] },
+      technical: { label: "Technical", variants: ["blueprint", "terminal", "schematic"] }
+    },
+    backgroundEffects: {
+      none: { label: "None" },
+      spirits: { label: "Spirits" },
+      image: { label: "Image" }
+    },
+    backgroundEffectAliases: {
+      aurora: "spirits",
+      "aurora-real": "spirits",
+      waves: "none"
     },
     navigationModes: {
       directional: { label: "Spatial arrows" },
@@ -83,6 +134,7 @@
     themePresets: {
       light: {
         label: "Light",
+        group: "neutral",
         colorScheme: "light",
         tokens: {
           bg: "#f3f4f6",
@@ -101,6 +153,7 @@
       },
       dark: {
         label: "Dark",
+        group: "neutral",
         colorScheme: "dark",
         tokens: {
           bg: "#101114",
@@ -119,6 +172,7 @@
       },
       graphite: {
         label: "Graphite",
+        group: "neutral",
         colorScheme: "dark",
         tokens: {
           bg: "#17181c",
@@ -137,6 +191,7 @@
       },
       paper: {
         label: "Paper",
+        group: "paper",
         colorScheme: "light",
         tokens: {
           bg: "#ebe7dc",
@@ -155,6 +210,7 @@
       },
       contrast: {
         label: "High Contrast",
+        group: "neutral",
         colorScheme: "dark",
         tokens: {
           bg: "#000000",
@@ -171,26 +227,28 @@
           "ring-guide": "rgba(255, 255, 255, 0.5)"
         }
       },
-      oxide: {
-        label: "Oxide",
+      "mono-high": {
+        label: "Mono High",
+        group: "neutral",
         colorScheme: "dark",
         tokens: {
-          bg: "#171312",
-          "surface-solid": "#2b211f",
-          ink: "#f7ede8",
-          muted: "#c8aaa1",
-          label: "#b89084",
-          field: "rgba(44, 34, 31, 0.9)",
-          "canvas-bg": "#1d1715",
-          "canvas-grid": "rgba(242, 120, 83, 0.07)",
-          "node-fill": "rgba(54, 41, 37, 0.92)",
-          "root-node-fill": "#f27853",
-          "root-node-ink": "#1b100d",
-          "ring-guide": "rgba(242, 120, 83, 0.32)"
+          bg: "#050505",
+          "surface-solid": "#141414",
+          ink: "#f8f8f8",
+          muted: "#cfcfcf",
+          label: "#e0e0e0",
+          field: "#0a0a0a",
+          "canvas-bg": "#000000",
+          "canvas-grid": "rgba(255, 255, 255, 0.11)",
+          "node-fill": "#0d0d0d",
+          "root-node-fill": "#ffffff",
+          "root-node-ink": "#000000",
+          "ring-guide": "rgba(255, 255, 255, 0.58)"
         }
       },
       sage: {
         label: "Sage",
+        group: "paper",
         colorScheme: "light",
         tokens: {
           bg: "#eef2ec",
@@ -209,6 +267,7 @@
       },
       solar: {
         label: "Solar",
+        group: "paper",
         colorScheme: "light",
         tokens: {
           bg: "#f6f0df",
@@ -225,26 +284,28 @@
           "ring-guide": "rgba(176, 112, 32, 0.3)"
         }
       },
-      "mono-high": {
-        label: "Mono High",
+      oxide: {
+        label: "Oxide",
+        group: "heat",
         colorScheme: "dark",
         tokens: {
-          bg: "#050505",
-          "surface-solid": "#141414",
-          ink: "#f8f8f8",
-          muted: "#cfcfcf",
-          label: "#e0e0e0",
-          field: "#0a0a0a",
-          "canvas-bg": "#000000",
-          "canvas-grid": "rgba(255, 255, 255, 0.11)",
-          "node-fill": "#0d0d0d",
-          "root-node-fill": "#ffffff",
-          "root-node-ink": "#000000",
-          "ring-guide": "rgba(255, 255, 255, 0.58)"
+          bg: "#171312",
+          "surface-solid": "#2b211f",
+          ink: "#f7ede8",
+          muted: "#c8aaa1",
+          label: "#b89084",
+          field: "rgba(44, 34, 31, 0.9)",
+          "canvas-bg": "#1d1715",
+          "canvas-grid": "rgba(242, 120, 83, 0.07)",
+          "node-fill": "rgba(54, 41, 37, 0.92)",
+          "root-node-fill": "#f27853",
+          "root-node-ink": "#1b100d",
+          "ring-guide": "rgba(242, 120, 83, 0.32)"
         }
       },
       ember: {
         label: "Ember",
+        group: "heat",
         colorScheme: "dark",
         tokens: {
           bg: "#120f12",
@@ -263,6 +324,7 @@
       },
       custom: {
         label: "Custom",
+        group: "custom",
         colorScheme: "light",
         tokens: {
           bg: "#f3f4f6",
@@ -280,11 +342,17 @@
         }
       }
     },
+    themeGroups: {
+      neutral: { label: "Neutral", variants: ["light", "dark", "graphite", "contrast", "mono-high"] },
+      paper: { label: "Paper", variants: ["paper", "sage", "solar"] },
+      heat: { label: "Heat", variants: ["ember", "oxide"] },
+      custom: { label: "Custom", variants: ["custom"] }
+    },
     modePacks: {
       research: {
         label: "Research Desk",
         theme: "sage",
-        stylePreset: "index-card",
+        stylePreset: "papery",
         navigationMode: "outline",
         viewMode: "radial",
         nodeFontSize: 13,
@@ -293,7 +361,7 @@
       ops: {
         label: "Ops Board",
         theme: "oxide",
-        stylePreset: "kanban",
+        stylePreset: "schematic",
         navigationMode: "hybrid",
         viewMode: "tree",
         nodeFontSize: 12.5,
@@ -302,7 +370,7 @@
       war: {
         label: "War Room",
         theme: "ember",
-        stylePreset: "radar",
+        stylePreset: "terminal",
         navigationMode: "directional",
         viewMode: "radial",
         nodeFontSize: 12,

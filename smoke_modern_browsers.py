@@ -86,10 +86,62 @@ def exercise_appearance_presets(page, *, check_overflow: bool = False) -> None:
     page.wait_for_selector(".settings-menu[open] .settings-panel", timeout=3000)
     theme_values = page.locator("#themePresetInput option").evaluate_all("options => options.map(option => option.value)")
     style_values = page.locator("#stylePresetInput option").evaluate_all("options => options.map(option => option.value)")
+    if not check_overflow:
+        custom_theme_button = page.locator("#themePresetDropdown .custom-select-button")
+        custom_theme_button.click()
+        page.wait_for_selector("#themePresetDropdown .custom-select-list:not([hidden])", timeout=3000)
+        if page.locator("#themePresetDropdown .custom-select-group").count() < 3:
+            raise AssertionError("Theme variants were not grouped in custom dropdown")
+        page.locator('#themePresetDropdown .custom-select-option[data-value="oxide"]').click()
+        page.wait_for_timeout(50)
+        if page.locator("#themePresetInput").input_value() != "oxide":
+            raise AssertionError("Custom theme dropdown did not select Oxide")
+        if "Oxide" not in custom_theme_button.text_content():
+            raise AssertionError("Custom theme dropdown label did not update")
+        custom_style_button = page.locator("#stylePresetDropdown .custom-select-button")
+        custom_style_button.click()
+        page.wait_for_selector("#stylePresetDropdown .custom-select-list:not([hidden])", timeout=3000)
+        if page.locator("#stylePresetDropdown .custom-select-group").count() < 3:
+            raise AssertionError("Style presets were not grouped in custom dropdown")
+        page.keyboard.press("Escape")
+        page.locator("#backgroundEffectDropdown .custom-select-button").click()
+        page.wait_for_selector("#backgroundEffectDropdown .custom-select-list:not([hidden])", timeout=3000)
+        if page.locator('#backgroundEffectDropdown .custom-select-option[data-value="waves"]').count() != 0:
+            raise AssertionError("Disabled Waves background still appeared in dropdown")
+        page.locator('#backgroundEffectDropdown .custom-select-option[data-value="spirits"]').click()
+        page.wait_for_timeout(50)
+        if page.evaluate("document.documentElement.dataset.background") != "spirits":
+            raise AssertionError("Spirits background did not set dataset")
+        if page.locator("#chartCanvas").evaluate("el => getComputedStyle(el).animationName") != "spiritsDrift":
+            raise AssertionError("Spirits background animation did not apply")
+        page.locator("#backgroundEffectInput").evaluate(
+            "(select) => { select.value = 'waves'; select.dispatchEvent(new Event('change', { bubbles: true })); }"
+        )
+        page.wait_for_timeout(50)
+        if page.evaluate("document.documentElement.dataset.background") != "none":
+            raise AssertionError("Legacy Waves background did not normalize to none")
+        page.locator("#backgroundEffectDropdown .custom-select-button").click()
+        page.locator('#backgroundEffectDropdown .custom-select-option[data-value="image"]').click()
+        page.wait_for_selector("#backgroundImageUpload:not([hidden])", timeout=3000)
+        with tempfile.NamedTemporaryFile("wb", suffix=".png", delete=False) as image_file:
+            image_file.write(bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c63f8ffff3f0005fe02fea73581e70000000049454e44ae426082"))
+            image_path = image_file.name
+        try:
+            page.locator("#backgroundImageInput").set_input_files(image_path)
+            page.wait_for_timeout(250)
+            if page.evaluate("document.documentElement.dataset.background") != "image":
+                raise AssertionError("Image background did not set dataset")
+            if "data:image/png" not in page.locator("#chartCanvas").evaluate("el => getComputedStyle(el).backgroundImage"):
+                raise AssertionError("Image background did not apply uploaded data URL")
+        finally:
+            Path(image_path).unlink(missing_ok=True)
     for theme in theme_values:
         if theme == "custom":
             continue
-        page.locator("#themePresetInput").select_option(theme)
+        page.locator("#themePresetInput").evaluate(
+            "(select, value) => { select.value = value; select.dispatchEvent(new Event('change', { bubbles: true })); }",
+            theme,
+        )
         page.wait_for_timeout(50)
         if page.locator("#themePresetInput").input_value() != theme:
             raise AssertionError(f"Theme preset did not stick: {theme}")
@@ -103,7 +155,10 @@ def exercise_appearance_presets(page, *, check_overflow: bool = False) -> None:
             THEME_OWNED_TOKENS,
         )
         for style in style_values:
-            page.locator("#stylePresetInput").select_option(style)
+            page.locator("#stylePresetInput").evaluate(
+                "(select, value) => { select.value = value; select.dispatchEvent(new Event('change', { bubbles: true })); }",
+                style,
+            )
             page.wait_for_timeout(50)
             if page.evaluate("document.documentElement.dataset.style") != style:
                 raise AssertionError(f"Style preset did not set dataset: {style}")
@@ -238,9 +293,17 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
         page.locator("#treeViewButton").click()
         if page.locator("#treeViewButton").get_attribute("aria-pressed") != "true":
             raise AssertionError("Flat view button did not activate")
+        page.locator("#layoutSettingsButton").click()
+        page.wait_for_selector("#layoutSettingsPanel:not([hidden])", timeout=3000)
+        if page.locator('[data-spacing-key="ringBaseRadius"]').is_visible():
+            raise AssertionError("Flat layout showed radial radius setting")
+        if not page.locator('[data-spacing-key="treeLevelGap"]').is_visible():
+            raise AssertionError("Flat layout hid layer spacing")
+        page.keyboard.press("Escape")
         for button_id, mode, label in [
             ("#radialViewButton", "radial", "Radial"),
-            ("#bookViewButton", "book", "Book"),
+            ("#bookViewButton", "book", "Tree"),
+            ("#documentViewButton", "document", "Book"),
         ]:
             page.locator(button_id).click()
             page.wait_for_timeout(200)
@@ -248,6 +311,26 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
                 raise AssertionError(f"{label} view button did not activate")
             if page.evaluate("document.documentElement.dataset.view") != mode:
                 raise AssertionError(f"{label} view did not set dataset")
+            page.locator("#layoutSettingsButton").click()
+            page.wait_for_selector("#layoutSettingsPanel:not([hidden])", timeout=3000)
+            if mode == "radial":
+                if not page.locator('[data-spacing-key="ringBaseRadius"]').is_visible():
+                    raise AssertionError("Radial layout hid center radius")
+                if page.locator('[data-spacing-key="treeLevelGap"]').is_visible():
+                    raise AssertionError("Radial layout showed flat layer spacing")
+            if mode == "book":
+                if page.locator('[data-spacing-key="ringNodeGap"]').is_visible():
+                    raise AssertionError("Tree layout showed radial node spacing")
+                if not page.locator('[data-spacing-key="treeLeafGap"]').is_visible():
+                    raise AssertionError("Tree layout hid column spacing")
+            if mode == "document":
+                if page.locator('[data-spacing-key="ringNodeGap"]').is_visible():
+                    raise AssertionError("Book document layout showed radial node spacing")
+                if page.locator('[data-spacing-key="treeLeafGap"]').is_visible():
+                    raise AssertionError("Book document layout showed column spacing")
+                if not page.locator('[data-spacing-key="treeLevelGap"]').is_visible():
+                    raise AssertionError("Book document layout hid paragraph spacing")
+            page.keyboard.press("Escape")
             if page.locator("#chartCanvas .node").count() < 3:
                 raise AssertionError(f"{label} view rendered missing nodes")
             if mode == "book":
@@ -273,7 +356,21 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
                 if any(text in canvas_text for text in raw_markdown):
                     raise AssertionError("Book view rendered raw markdown markers")
                 if page.locator("#chartCanvas .markdown-link[role='link']").count() < 2:
-                    raise AssertionError("Book view markdown links are not interactable")
+                    raise AssertionError("Tree view markdown links are not interactable")
+            if mode == "document":
+                if page.locator("#chartCanvas .node.view-document.role-doc-title").count() != 1:
+                    raise AssertionError("Book document view did not render document title")
+                if page.locator("#chartCanvas .node.view-document.role-section").count() < 1:
+                    raise AssertionError("Book document view did not render sections")
+                document_left_edges = page.evaluate(
+                    """() => Array.from(document.querySelectorAll('#chartCanvas .node.view-document.role-doc-title, #chartCanvas .node.view-document.role-section'))
+                        .slice(0, 3)
+                        .map(node => node.getBBox().x)"""
+                )
+                if max(document_left_edges) - min(document_left_edges) > 2:
+                    raise AssertionError(f"Book document nodes are not left aligned: {document_left_edges}")
+                if page.locator("#chartCanvas .edge").first.is_visible():
+                    raise AssertionError("Book document view showed map edges")
         page.locator("#radialViewButton").click()
         page.wait_for_timeout(200)
         focused_before = page.locator("#chartCanvas .node.focused .node-label").text_content()
@@ -298,6 +395,12 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
         zoomed_viewbox = page.locator("#chartCanvas").get_attribute("viewBox")
         page.locator("#chartCanvas .node").nth(1).click()
         page.wait_for_timeout(150)
+        if page.locator("#nodeActionBar").get_attribute("hidden") is not None:
+            raise AssertionError("Node focus control did not open after node click")
+        page.locator("#chartCanvas").dispatch_event("pointerdown", {"button": 0, "bubbles": True})
+        page.wait_for_timeout(100)
+        if page.locator("#nodeActionBar").get_attribute("hidden") is not None:
+            raise AssertionError("Background click dismissed focus control")
         focused_viewbox = page.locator("#chartCanvas").get_attribute("viewBox")
         if not zoomed_viewbox or not focused_viewbox:
             raise AssertionError("Missing viewBox after zoom/focus")
@@ -319,16 +422,20 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
             raise AssertionError(f"Trackpad pan did not move both axes: {before_pan} -> {after_pan}")
 
         page.locator(".settings-menu > summary").click()
+        page.locator("#radialViewButton").click()
         page.locator("[data-layout-preset='wide']").click()
         page.wait_for_timeout(150)
         if page.locator("#ringBaseRadiusInput").input_value() != "155":
             raise AssertionError("Layout preset did not update number input")
         if page.locator("#ringBaseRadiusRange").input_value() != "155":
             raise AssertionError("Layout preset did not update range input")
+        page.locator("#layoutSettingsButton").click()
+        page.wait_for_selector("#layoutSettingsPanel:not([hidden])", timeout=3000)
         page.locator("#ringNodeGapRange").fill("40")
         page.wait_for_timeout(150)
         if page.locator("#ringNodeGapInput").input_value() != "40":
             raise AssertionError("Range control did not sync number input")
+        page.keyboard.press("Escape")
         page.locator(".settings-menu > summary").click()
         exercise_appearance_presets(page)
 
@@ -338,6 +445,27 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
         download = download_info.value
         if not download.suggested_filename.endswith(".mind.json"):
             raise AssertionError(f"Unexpected export filename: {download.suggested_filename}")
+        page.locator("#recoveryButton").click()
+        page.wait_for_selector("#recoveryDialog:not([hidden])", timeout=3000)
+        if "nodes" not in (page.locator("#recoveryCurrentStats").text_content() or ""):
+            raise AssertionError("Recovery current stats did not render")
+        page.locator("#recoverySavePointButton").click()
+        page.wait_for_timeout(150)
+        if page.locator("#recoveryList .recovery-item").count() < 1:
+            raise AssertionError("Recovery point did not render")
+        page.locator("#recoveryCloseButton").click()
+        page.locator("#titleInput").fill("Broken Smoke Root")
+        page.wait_for_timeout(150)
+        if "Broken Smoke Root" not in (page.locator("#chartCanvas").text_content() or ""):
+            raise AssertionError("Recovery setup rename did not render")
+        page.on("dialog", lambda dialog: dialog.accept())
+        page.locator(".mind-menu > summary").click()
+        page.locator("#recoveryButton").click()
+        page.wait_for_selector("#recoveryDialog:not([hidden])", timeout=3000)
+        page.locator("#recoveryList .recovery-item").first.locator("button", has_text="Restore").click()
+        page.wait_for_timeout(350)
+        if "Modern Smoke Root" not in (page.locator("#chartCanvas").text_content() or ""):
+            raise AssertionError("Recovery restore did not restore original title")
 
         before_maps = page.locator("#mapSelect option").count()
         page.locator("#newMapButton").click()
@@ -345,8 +473,13 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
         after_maps = page.locator("#mapSelect option").count()
         if after_maps != before_maps + 1:
             raise AssertionError(f"New map count mismatch: {before_maps} -> {after_maps}")
+        page.locator("#mapSelectDropdown .custom-select-button").click()
+        page.wait_for_selector("#mapSelectDropdown .custom-select-list:not([hidden])", timeout=3000)
+        if page.locator("#mapSelectDropdown .custom-select-option").count() != after_maps:
+            raise AssertionError("Custom map dropdown option count mismatch")
+        page.keyboard.press("Escape")
 
-        page.on("dialog", lambda dialog: dialog.accept())
+        page.locator(".mind-menu > summary").click()
         page.locator("#deleteMapButton").click()
         page.wait_for_timeout(250)
         final_maps = page.locator("#mapSelect option").count()

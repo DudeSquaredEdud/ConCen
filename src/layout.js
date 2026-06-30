@@ -7,42 +7,65 @@
   function createLayoutEngine() {
     const measureCanvas = document.createElement("canvas");
     const measureContext = measureCanvas.getContext("2d");
+    const nodeSizeCache = new Map();
+    let fontMetrics = null;
 
     function measureLabel(label) {
-      measureContext.font = measureFont();
+      measureContext.font = readFontMetrics().font;
       return measureContext.measureText(label).width;
     }
 
-    function measureFont() {
+    function readFontMetrics() {
       const rootStyle = getComputedStyle(document.documentElement);
-      const size = rootStyle.getPropertyValue("--node-font-size").trim() || "13px";
+      const sizeText = rootStyle.getPropertyValue("--node-font-size").trim() || "13px";
+      const numericSize = parseFloat(sizeText);
       const family = getComputedStyle(document.body).fontFamily || "Inter, ui-sans-serif, system-ui, sans-serif";
-      return `800 ${size} ${family}`;
+      const key = `${sizeText}|${family}`;
+      if (!fontMetrics || fontMetrics.key !== key) {
+        nodeSizeCache.clear();
+        fontMetrics = {
+          key,
+          size: Number.isFinite(numericSize) ? numericSize : 13,
+          font: `800 ${sizeText} ${family}`
+        };
+      }
+      return fontMetrics;
     }
 
     function nodeFontSize() {
-      const rootStyle = getComputedStyle(document.documentElement);
-      const value = parseFloat(rootStyle.getPropertyValue("--node-font-size"));
-      return Number.isFinite(value) ? value : 13;
+      return readFontMetrics().size;
     }
 
     function nodeSize(node, viewMode) {
+      const metrics = readFontMetrics();
+      const cacheKey = [
+        metrics.key,
+        viewMode || "",
+        node.id,
+        node.depth,
+        node.label,
+        node.note || ""
+      ].join("\u0001");
+      const cached = nodeSizeCache.get(cacheKey);
+      if (cached) return cached;
       const base = config.layout;
-      const fontSize = nodeFontSize();
+      const fontSize = metrics.size;
       const scale = fontSize / 13;
       const minWidth = node.depth === 0 ? base.rootWidth : base.nodeWidth;
       const minHeight = node.depth === 0 ? base.rootHeight : base.nodeHeight;
       const contentSize = contentNodeSize(node, viewMode, scale);
-      if (contentSize) return contentSize;
-      return {
+      const size = contentSize || {
         width: Math.max(minWidth * scale, Math.ceil(measureLabel(node.label) + base.nodePadX * scale * 2)),
         height: Math.max(minHeight, Math.ceil(minHeight * scale))
       };
+      if (nodeSizeCache.size > 5000) nodeSizeCache.clear();
+      nodeSizeCache.set(cacheKey, size);
+      return size;
     }
 
     function contentNodeSize(node, viewMode, scale) {
       const mode = String(viewMode || "");
-      if (mode !== "book") return null;
+      if (mode !== "book" && mode !== "document") return null;
       const note = normalizedNote(node.note);
       const profile = contentProfile(mode, node.depth);
       const labelLines = wrappedLineCount(node.label, profile.labelChars, profile.labelLines);
@@ -62,6 +85,12 @@
           1: { width: 360, minHeight: 86, labelChars: 25, labelLines: 2, noteChars: 44, noteLines: Infinity, paddingY: 17, labelLineHeight: 22, noteGap: 11, noteLineHeight: 15 },
           2: { width: 390, minHeight: 82, labelChars: 30, labelLines: 2, noteChars: 48, noteLines: Infinity, paddingY: 16, labelLineHeight: 20, noteGap: 10, noteLineHeight: 14 },
           3: { width: 330, minHeight: 72, labelChars: 26, labelLines: 2, noteChars: 40, noteLines: Infinity, paddingY: 14, labelLineHeight: 18, noteGap: 8, noteLineHeight: 13 }
+        },
+        document: {
+          0: { width: 780, minHeight: 132, labelChars: 40, labelLines: 2, noteChars: 86, noteLines: Infinity, paddingY: 28, labelLineHeight: 34, noteGap: 16, noteLineHeight: 17 },
+          1: { width: 760, minHeight: 92, labelChars: 52, labelLines: 2, noteChars: 84, noteLines: Infinity, paddingY: 18, labelLineHeight: 25, noteGap: 12, noteLineHeight: 16 },
+          2: { width: 720, minHeight: 78, labelChars: 56, labelLines: 2, noteChars: 80, noteLines: Infinity, paddingY: 15, labelLineHeight: 21, noteGap: 10, noteLineHeight: 15 },
+          3: { width: 680, minHeight: 68, labelChars: 58, labelLines: 2, noteChars: 76, noteLines: Infinity, paddingY: 13, labelLineHeight: 18, noteGap: 8, noteLineHeight: 14 }
         }
       };
       return (profiles[viewMode] && profiles[viewMode][depth]) || profiles[viewMode][3];
@@ -144,7 +173,7 @@
     }
 
     function treeLeafGap(tree, spacing) {
-      return Math.max(spacing.treeLeafGap, maxNodeWidth(tree) + 28);
+      return Math.max(spacing.treeLeafGap, maxNodeWidth(tree) + 14);
     }
 
     function maxPrimaryLeafCount(tree, counts) {
@@ -155,6 +184,7 @@
     function worldSize(tree, viewport, viewMode, spacing) {
       const nodeWidth = maxNodeWidth(tree, viewMode);
       if (viewMode === "book") return structuredWorldSize(tree, viewport, viewMode, spacing);
+      if (viewMode === "document") return documentWorldSize(tree, viewport, viewMode, spacing);
       const radius = viewMode === "radial" ? radialDiskRadius(tree, spacing) : flatRingRadius(tree, spacing);
       const ringDiameter = radius * 2 + nodeWidth + 48;
       return {
@@ -181,6 +211,10 @@
         const book = bookLayout(tree, nodes, world, spacing);
         resolveNodeOverlaps(nodes, book.positions, viewMode);
         return { world, positions: book.positions, nodes, rings: [], bounds: layoutBounds(nodes, book.positions, viewMode) };
+      }
+      if (viewMode === "document") {
+        const documentLayoutResult = documentLayout(tree, nodes, world, spacing);
+        return { world, positions: documentLayoutResult.positions, nodes, rings: [], bounds: layoutBounds(nodes, documentLayoutResult.positions, viewMode) };
       }
       const flat = flatRingLayout(tree, nodes, world, spacing);
       staggerCrowdedRingNodes(nodes, flat.positions, flat.center);
@@ -249,7 +283,7 @@
       const rowGap = structuredRowGap(spacing, "book");
       const primaries = tree.children;
       const startX = world.width / 2 - ((Math.max(primaries.length, 1) - 1) * columnWidth) / 2;
-      const rootY = Math.max(config.layout.rootHeight / 2 + 52, 92);
+      const rootY = Math.max(config.layout.rootHeight / 2 + 36, 72);
       positions.set(model.ROOT_ID, { x: world.width / 2, y: rootY });
       primaries.forEach((primary, primaryIndex) => {
         const x = startX + primaryIndex * columnWidth;
@@ -267,6 +301,23 @@
             previous = leaf;
           });
         });
+      });
+      fillMissingStructured(nodes, positions, world);
+      return { positions };
+    }
+
+    function documentLayout(tree, nodes, world, spacing) {
+      const positions = new Map();
+      const pageWidth = documentPageWidth();
+      const pageLeft = (world.width - pageWidth) / 2;
+      const rowGap = Math.max(16, spacing.treeLevelGap * 0.34);
+      let y = 76;
+      documentNodes(tree).forEach((node) => {
+        const size = nodeSize(node, "document");
+        const indent = documentIndent(node.depth);
+        const centerX = pageLeft + indent + size.width / 2;
+        positions.set(node.id, { x: centerX, y: y + size.height / 2 });
+        y += size.height + (node.depth === 0 ? rowGap * 1.35 : rowGap);
       });
       fillMissingStructured(nodes, positions, world);
       return { positions };
@@ -304,34 +355,64 @@
     function flatRingRadius(tree, spacing) {
       const nodes = model.visibleNodes(tree).filter(({ node }) => node.id !== model.ROOT_ID);
       if (!nodes.length) return Math.max(spacing.treeLevelGap, spacing.ringBaseRadius);
-      const nodeArc = Math.max(spacing.treeLeafGap, maxNodeWidth(tree) + spacing.ringNodeGap);
+      const nodeArc = Math.max(spacing.treeLeafGap, maxNodeWidth(tree) * 0.82 + spacing.ringNodeGap);
       return Math.max(spacing.ringBaseRadius, spacing.treeLevelGap) + (nodes.length * nodeArc) / (Math.PI * 2);
     }
 
     function radialDiskRadius(tree, spacing) {
       const nodes = model.visibleNodes(tree).filter(({ node }) => node.id !== model.ROOT_ID);
       if (!nodes.length) return Math.max(spacing.ringBaseRadius, spacing.treeLevelGap);
-      const nodeFootprint = Math.max(maxNodeWidth(tree) + spacing.ringNodeGap, spacing.treeLeafGap);
-      const countRadius = Math.sqrt(nodes.length) * nodeFootprint * 0.72;
-      const depthRadius = maxDepthForTree(tree) * Math.max(spacing.ringDepthGap * 0.72, config.layout.nodeHeight + spacing.ringNodeGap);
-      return Math.max(spacing.ringBaseRadius * 1.1, countRadius, depthRadius);
+      const nodeFootprint = Math.max(maxNodeWidth(tree) * 0.86 + spacing.ringNodeGap, spacing.treeLeafGap);
+      const countRadius = Math.sqrt(nodes.length) * nodeFootprint * 0.62;
+      const depthRadius = maxDepthForTree(tree) * Math.max(spacing.ringDepthGap * 0.62, config.layout.nodeHeight + spacing.ringNodeGap * 0.6);
+      return Math.max(spacing.ringBaseRadius, countRadius, depthRadius);
     }
 
     function structuredWorldSize(tree, viewport, viewMode, spacing) {
       const columnWidth = structuredColumnWidth(tree, spacing, viewMode);
       const columnCount = Math.max(tree.children.length, 1);
       return {
-        width: Math.max(viewport.width + 240, columnCount * columnWidth + 220),
-        height: Math.max(viewport.height + 180, structuredContentHeight(tree, viewMode, spacing) + 240)
+        width: Math.max(viewport.width + 160, columnCount * columnWidth + 160),
+        height: Math.max(viewport.height + 120, structuredContentHeight(tree, viewMode, spacing) + 160)
       };
     }
 
+    function documentWorldSize(tree, viewport, viewMode, spacing) {
+      const rowGap = Math.max(16, spacing.treeLevelGap * 0.34);
+      let contentHeight = 76;
+      documentNodes(tree).forEach((node) => {
+        contentHeight += nodeSize(node, viewMode).height + (node.depth === 0 ? rowGap * 1.35 : rowGap);
+      });
+      return {
+        width: Math.max(viewport.width + 160, documentPageWidth() + 220),
+        height: Math.max(viewport.height + 140, contentHeight + 96)
+      };
+    }
+
+    function documentNodes(tree) {
+      const result = [];
+      const visit = (node) => {
+        result.push(node);
+        node.children.forEach(visit);
+      };
+      visit(tree);
+      return result;
+    }
+
+    function documentPageWidth() {
+      return 820;
+    }
+
+    function documentIndent(depth) {
+      return 0;
+    }
+
     function structuredColumnWidth(tree, spacing, viewMode) {
-      return Math.max(maxNodeWidth(tree, viewMode) + spacing.treeLeafGap, 230);
+      return Math.max(maxNodeWidth(tree, viewMode) + spacing.treeLeafGap, 188);
     }
 
     function structuredRowGap(spacing, viewMode) {
-      const base = Math.max(config.layout.nodeHeight + 30, spacing.treeLevelGap * 0.78);
+      const base = Math.max(config.layout.nodeHeight + 12, spacing.treeLevelGap * 0.68);
       return base;
     }
 
@@ -592,6 +673,7 @@
           return { node, point, size: nodeSize(node, viewMode) };
         })
         .filter(Boolean);
+      if (items.length > config.layout.maxOverlapResolveNodes) return;
       const padding = config.layout.overlapPadding;
 
       for (let pass = 0; pass < config.layout.overlapResolvePasses; pass += 1) {
