@@ -104,6 +104,7 @@
       blueprint: { label: "Blueprint" },
       terminal: { label: "Terminal" },
       soft: { label: "Soft" },
+      dust: { label: "Dust" },
       schematic: { label: "Schematic" }
     },
     styleAliases: {
@@ -113,18 +114,20 @@
     },
     styleGroups: {
       core: { label: "Core", variants: ["glass", "soft", "print"] },
-      texture: { label: "Texture", variants: ["papery"] },
+      texture: { label: "Texture", variants: ["papery", "dust"] },
       technical: { label: "Technical", variants: ["blueprint", "terminal", "schematic"] }
     },
     backgroundEffects: {
       none: { label: "None" },
       spirits: { label: "Spirits" },
+      dunes: { label: "Dunes" },
+      circles: { label: "Circles" },
       image: { label: "Image" }
     },
     backgroundEffectAliases: {
       aurora: "spirits",
       "aurora-real": "spirits",
-      waves: "none"
+      waves: "circles"
     },
     navigationModes: {
       directional: { label: "Spatial arrows" },
@@ -284,6 +287,25 @@
           "ring-guide": "rgba(176, 112, 32, 0.3)"
         }
       },
+      sand: {
+        label: "Sand",
+        group: "paper",
+        colorScheme: "light",
+        tokens: {
+          bg: "#e8dbc3",
+          "surface-solid": "#fff4dd",
+          ink: "#312819",
+          muted: "#7c6d52",
+          label: "#897456",
+          field: "rgba(255, 246, 226, 0.9)",
+          "canvas-bg": "#efe1c3",
+          "canvas-grid": "rgba(132, 104, 62, 0.06)",
+          "node-fill": "rgba(255, 246, 226, 0.93)",
+          "root-node-fill": "#8b6b38",
+          "root-node-ink": "#fff6e4",
+          "ring-guide": "rgba(132, 104, 62, 0.32)"
+        }
+      },
       oxide: {
         label: "Oxide",
         group: "heat",
@@ -344,7 +366,7 @@
     },
     themeGroups: {
       neutral: { label: "Neutral", variants: ["light", "dark", "graphite", "contrast", "mono-high"] },
-      paper: { label: "Paper", variants: ["paper", "sage", "solar"] },
+      paper: { label: "Paper", variants: ["paper", "sage", "solar", "sand"] },
       heat: { label: "Heat", variants: ["ember", "oxide"] },
       custom: { label: "Custom", variants: ["custom"] }
     },

@@ -5,6 +5,7 @@
   const { config, model, storage, utils } = RingMapChart;
   const WELCOME_KEY = "ring-map-chart-welcome-v1";
   const GITHUB_SYNC_KEY = "concen-github-sync-v1";
+  const AUTHOR_PROFILE_KEY = "concen-author-profile-v1";
   const UNDO_MAX_ITEMS = 40;
   const UNDO_MAX_BYTES = 2500000;
   const RECENT_MAX_ITEMS = 6;
@@ -104,6 +105,10 @@
     this.theme = "light";
     this.customTheme = storage.normalizeCustomTheme(null);
     this.branchColors = DEFAULT_BRANCH_COLORS.slice();
+    this.workspaceId = workspaceId();
+    this.workspaceUpdatedAt = new Date().toISOString();
+    this.authorProfile = loadAuthorProfile();
+    this.workspaceSync = storage.normalizeWorkspaceSync(null);
     this.viewMode = "radial";
     this.viewport = { width: config.layout.minViewportWidth, height: config.layout.minViewportHeight };
     this.world = { width: config.layout.minViewportWidth, height: config.layout.minViewportHeight };
@@ -136,6 +141,8 @@
     this.nodeLinkItems = [];
     this.nodeLinkIndex = 0;
     this.nodeLinkRange = null;
+    this.appDialogResolve = null;
+    this.appDialogCancelValue = null;
     this.saveStateTimer = null;
     this.recentMinds = [];
     this.githubSync = loadGithubSyncConfig();
@@ -160,6 +167,10 @@
     if (!saved) {
       this.store = model.createStore();
       this.mind = model.createMindFromTree(this.store.tree);
+      this.workspaceId = workspaceId();
+      this.workspaceUpdatedAt = new Date().toISOString();
+      this.authorProfile = storage.normalizeAuthorProfile(this.authorProfile);
+      this.workspaceSync = storage.normalizeWorkspaceSync(null);
       const map = this.createMap(model.ROOT_ID, "Chart Title");
       this.maps = [map];
       this.activeMapId = map.id;
@@ -167,6 +178,11 @@
       return;
     }
     this.mind = saved.mind;
+    this.workspaceId = saved.workspaceId || workspaceId();
+    this.workspaceUpdatedAt = saved.updatedAt || new Date().toISOString();
+    this.authorProfile = authorProfileForWorkspace(saved.authorProfile, this.authorProfile);
+    saveAuthorProfile(this.authorProfile);
+    this.workspaceSync = storage.normalizeWorkspaceSync(saved.sync);
     this.maps = saved.maps;
     this.activeMapId = saved.activeMapId;
     this.appearance = storage.normalizeAppearance(saved.appearance, config.appearanceDefaults);
@@ -239,6 +255,9 @@
     if (this.el.recoveryDialog) this.el.recoveryDialog.addEventListener("pointerdown", (event) => {
       if (event.target === this.el.recoveryDialog) this.closeRecovery();
     });
+    if (this.el.appDialog) this.el.appDialog.addEventListener("pointerdown", (event) => {
+      if (event.target === this.el.appDialog) this.closeAppDialog(this.appDialogCancelValue);
+    });
     if (this.el.recoveryExportCurrentButton) this.el.recoveryExportCurrentButton.addEventListener("click", () => this.exportCurrentRecoveryBackup());
     if (this.el.recoverySavePointButton) this.el.recoverySavePointButton.addEventListener("click", () => this.saveRecoveryPoint());
     if (this.el.recoveryClearButton) this.el.recoveryClearButton.addEventListener("click", () => this.clearRecentMinds("recovery"));
@@ -249,6 +268,13 @@
     if (this.el.githubPushButton) this.el.githubPushButton.addEventListener("click", () => this.pushMindToGithub());
     if (this.el.githubPullButton) this.el.githubPullButton.addEventListener("click", () => this.pullMindFromGithub());
     if (this.el.githubDisconnectButton) this.el.githubDisconnectButton.addEventListener("click", () => this.disconnectGithubSync());
+    if (this.el.saveAuthorProfileButton) this.el.saveAuthorProfileButton.addEventListener("click", () => this.saveAuthorProfileFromInput());
+    if (this.el.trustRecoveryButton) this.el.trustRecoveryButton.addEventListener("click", () => this.saveRecoveryPoint());
+    if (this.el.trustBackupButton) this.el.trustBackupButton.addEventListener("click", () => this.exportCurrentRecoveryBackup());
+    if (this.el.trustOpenRecoveryButton) this.el.trustOpenRecoveryButton.addEventListener("click", () => this.openRecovery());
+    if (this.el.trustPushButton) this.el.trustPushButton.addEventListener("click", () => this.pushMindToGithub());
+    if (this.el.trustPullButton) this.el.trustPullButton.addEventListener("click", () => this.pullMindFromGithub());
+    if (this.el.trustDisconnectButton) this.el.trustDisconnectButton.addEventListener("click", () => this.disconnectGithubSync());
     if (this.el.clearRecentMindsButton) this.el.clearRecentMindsButton.addEventListener("click", () => this.clearRecentMinds("recent"));
     [this.el.mindMenu, this.el.settingsMenu].forEach((menu) => {
       if (!menu) return;
@@ -555,6 +581,11 @@
       this.closeRecovery();
       return;
     }
+    if (event.key === "Escape" && this.el.appDialog && !this.el.appDialog.hidden) {
+      event.preventDefault();
+      this.closeAppDialog(this.appDialogCancelValue);
+      return;
+    }
     if (event.key === "Escape" && this.activeCustomSelect) {
       event.preventDefault();
       this.closeCustomSelect();
@@ -658,7 +689,8 @@
       (this.el.commandPalette && !this.el.commandPalette.hidden) ||
       (this.el.welcomeDialog && !this.el.welcomeDialog.hidden) ||
       (this.el.shortcutSheet && !this.el.shortcutSheet.hidden) ||
-      (this.el.recoveryDialog && !this.el.recoveryDialog.hidden)
+      (this.el.recoveryDialog && !this.el.recoveryDialog.hidden) ||
+      (this.el.appDialog && !this.el.appDialog.hidden)
     );
   };
 
@@ -697,10 +729,15 @@
     this.el.svg.focus();
   };
 
-  Controller.prototype.deleteFocused = function () {
+  Controller.prototype.deleteFocused = async function () {
     const found = model.findNode(this.store.tree, this.store.focusedId);
     if (!found || this.store.focusedId === model.ROOT_ID) return;
-    if (found.node.children.length && !confirm("Delete node and all child nodes?")) return;
+    if (found.node.children.length && !await this.confirmAction({
+      title: "Delete node",
+      message: "Delete this node and all child nodes?",
+      confirmLabel: "Delete",
+      danger: true
+    })) return;
     const map = this.currentMap();
     const sourceId = map ? model.sourceIdForViewNode(found.node, map.rootNodeId) : null;
     this.pushUndoSnapshot();
@@ -758,11 +795,19 @@
     this.el.svg.focus();
   };
 
-  Controller.prototype.reset = function () {
-    if (!confirm("Reset ring map chart?")) return;
+  Controller.prototype.reset = async function () {
+    if (!await this.confirmAction({
+      title: "Reset mind",
+      message: "Reset this mind to a blank ConCen workspace?",
+      confirmLabel: "Reset",
+      danger: true
+    })) return;
     this.pushUndoSnapshot();
     this.store = model.createStore();
     this.mind = model.createMindFromTree(this.store.tree);
+    this.workspaceId = workspaceId();
+    this.workspaceUpdatedAt = new Date().toISOString();
+    this.workspaceSync = storage.normalizeWorkspaceSync(null);
     this.maps = [this.createMap(model.ROOT_ID, this.store.tree.label)];
     this.activeMapId = this.maps[0].id;
     this.viewMode = "radial";
@@ -855,6 +900,9 @@
     this.pushUndoSnapshot();
     this.store = model.createStore();
     this.mind = model.createMindFromTree(this.store.tree);
+    this.workspaceId = workspaceId();
+    this.workspaceUpdatedAt = new Date().toISOString();
+    this.workspaceSync = storage.normalizeWorkspaceSync(null);
     this.maps = [this.createMap(model.ROOT_ID, this.store.tree.label)];
     this.activeMapId = this.maps[0].id;
     this.downMapStack = [];
@@ -925,12 +973,17 @@
     this.el.svg.focus();
   };
 
-  Controller.prototype.deleteActiveMap = function () {
+  Controller.prototype.deleteActiveMap = async function () {
     if (this.maps.length <= 1) {
-      this.reset();
+      await this.reset();
       return;
     }
-    if (!confirm("Delete current ring map?")) return;
+    if (!await this.confirmAction({
+      title: "Delete map",
+      message: "Delete the current map view? The mind nodes remain available from other maps.",
+      confirmLabel: "Delete",
+      danger: true
+    })) return;
     this.pushUndoSnapshot();
     const index = this.maps.findIndex((map) => map.id === this.activeMapId);
     if (index < 0) return;
@@ -1157,6 +1210,7 @@
     this.syncAppearanceInputs(true);
     this.syncStyleControls();
     this.syncGithubControls();
+    this.syncTrustDataControls();
     this.updateStatus();
   };
 
@@ -1212,6 +1266,40 @@
       const input = this.el[key];
       if (input && document.activeElement !== input) input.value = value;
     });
+  };
+
+  Controller.prototype.syncTrustDataControls = function () {
+    if (this.el.authorDisplayNameInput && document.activeElement !== this.el.authorDisplayNameInput) {
+      this.el.authorDisplayNameInput.value = this.authorProfile.displayName || "";
+    }
+    if (!this.el.trustDataSummary) return;
+    const nodeCount = this.mind && this.mind.nodes ? Object.keys(this.mind.nodes).length : 0;
+    const mapCount = Array.isArray(this.maps) ? this.maps.length : 0;
+    const sync = this.githubSync || {};
+    const target = sync.owner && sync.repo && sync.path ? `${sync.owner}/${sync.repo}:${sync.path}` : "No GitHub target";
+    const lastSync = this.workspaceSync.lastPushedAt || this.workspaceSync.lastPulledAt || "";
+    this.el.trustDataSummary.replaceChildren();
+    [
+      `Schema v2`,
+      `${nodeCount} nodes · ${mapCount} maps`,
+      `Updated ${shortDate(this.workspaceUpdatedAt)}`,
+      `Author ${this.authorProfile.displayName || "not set"}`,
+      target,
+      lastSync ? `Last sync ${shortDate(lastSync)}` : "No completed sync"
+    ].forEach((line) => {
+      const item = document.createElement("span");
+      item.textContent = line;
+      this.el.trustDataSummary.append(item);
+    });
+  };
+
+  Controller.prototype.saveAuthorProfileFromInput = function () {
+    const displayName = utils.cleanLabel(this.el.authorDisplayNameInput && this.el.authorDisplayNameInput.value);
+    this.authorProfile = storage.normalizeAuthorProfile(Object.assign({}, this.authorProfile, { displayName }));
+    saveAuthorProfile(this.authorProfile);
+    this.save();
+    this.syncTrustDataControls();
+    this.updateStatus(displayName ? "Author saved" : "Author cleared");
   };
 
   Controller.prototype.updateStatus = function (message) {
@@ -1320,16 +1408,7 @@
       this.saveFocusedNote();
       return;
     }
-    this.captureActiveMap();
-    const saved = storage.save({
-      mind: this.mind,
-      maps: this.maps,
-      activeMapId: this.activeMapId,
-      appearance: this.appearance,
-      theme: this.theme,
-      customTheme: this.customTheme,
-      branchColors: this.branchColors
-    });
+    const saved = storage.save(this.workspaceSnapshot({ touchUpdatedAt: true }));
     this.markSaved(saved);
   };
 
@@ -1923,6 +2002,10 @@
       maps: this.maps,
       activeMapId: this.activeMapId,
       downMapStack: this.downMapStack,
+      workspaceId: this.workspaceId,
+      workspaceUpdatedAt: this.workspaceUpdatedAt,
+      authorProfile: this.authorProfile,
+      workspaceSync: this.workspaceSync,
       appearance: this.appearance,
       theme: this.theme,
       customTheme: this.customTheme,
@@ -1933,6 +2016,10 @@
   Controller.prototype.restoreSnapshot = function (raw) {
     const snapshot = JSON.parse(raw);
     this.mind = snapshot.mind;
+    this.workspaceId = snapshot.workspaceId || this.workspaceId || workspaceId();
+    this.workspaceUpdatedAt = snapshot.workspaceUpdatedAt || new Date().toISOString();
+    this.authorProfile = authorProfileForWorkspace(snapshot.authorProfile, this.authorProfile);
+    this.workspaceSync = storage.normalizeWorkspaceSync(snapshot.workspaceSync);
     this.maps = snapshot.maps;
     this.activeMapId = snapshot.activeMapId;
     this.downMapStack = Array.isArray(snapshot.downMapStack) ? snapshot.downMapStack : [];
@@ -1987,6 +2074,72 @@
   Controller.prototype.closeCommandPalette = function () {
     this.el.commandPalette.hidden = true;
     this.el.svg.focus();
+  };
+
+  Controller.prototype.openAppDialog = function (options) {
+    if (!this.el.appDialog) return Promise.resolve(options && options.cancelValue);
+    if (this.el.appDialog && !this.el.appDialog.hidden) this.closeAppDialog(this.appDialogCancelValue);
+    const config = options || {};
+    this.appDialogCancelValue = config.cancelValue;
+    if (this.el.appDialogEyebrow) this.el.appDialogEyebrow.textContent = config.eyebrow || "Confirm";
+    if (this.el.appDialogTitle) this.el.appDialogTitle.textContent = config.title || "Confirm action";
+    if (this.el.appDialogMessage) this.el.appDialogMessage.textContent = config.message || "";
+    if (this.el.appDialogActions) {
+      this.el.appDialogActions.replaceChildren();
+      (config.actions || []).forEach((action) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = action.label;
+        if (action.icon) button.dataset.icon = action.icon;
+        if (action.kind === "primary") button.classList.add("button-primary");
+        if (action.kind === "danger") button.classList.add("button-danger");
+        button.addEventListener("click", () => this.closeAppDialog(action.value));
+        this.el.appDialogActions.append(button);
+      });
+    }
+    this.el.appDialog.hidden = false;
+    return new Promise((resolve) => {
+      this.appDialogResolve = resolve;
+      requestAnimationFrame(() => {
+        const focusTarget = this.el.appDialogActions && this.el.appDialogActions.querySelector(".button-primary, .button-danger, button");
+        if (focusTarget) focusTarget.focus();
+      });
+    });
+  };
+
+  Controller.prototype.closeAppDialog = function (value) {
+    if (!this.el.appDialog || this.el.appDialog.hidden) return;
+    this.el.appDialog.hidden = true;
+    if (this.el.appDialogActions) this.el.appDialogActions.replaceChildren();
+    const resolve = this.appDialogResolve;
+    this.appDialogResolve = null;
+    const result = value === undefined ? this.appDialogCancelValue : value;
+    this.appDialogCancelValue = null;
+    if (resolve) resolve(result);
+    if (this.el.svg) this.el.svg.focus();
+  };
+
+  Controller.prototype.confirmAction = function (options) {
+    return this.openAppDialog({
+      eyebrow: options && options.eyebrow || "Confirm",
+      title: options && options.title || "Confirm action",
+      message: options && options.message || "",
+      cancelValue: false,
+      actions: [
+        { label: options && options.cancelLabel || "Cancel", value: false },
+        { label: options && options.confirmLabel || "Continue", value: true, kind: options && options.danger ? "danger" : "primary" }
+      ]
+    });
+  };
+
+  Controller.prototype.chooseAction = function (options) {
+    return this.openAppDialog({
+      eyebrow: options && options.eyebrow || "Choose",
+      title: options && options.title || "Choose action",
+      message: options && options.message || "",
+      cancelValue: options && options.cancelValue || "",
+      actions: options && options.actions || [{ label: "Cancel", value: "" }]
+    });
   };
 
   Controller.prototype.openShortcutSheet = function () {
@@ -2133,8 +2286,13 @@
     this.updateStatus(result === "duplicate" ? "Recovery already current" : "Recovery point saved");
   };
 
-  Controller.prototype.restoreRecoveryPoint = function (recentId) {
-    if (!confirm("Restore this recovery point and replace current browser mind?")) return;
+  Controller.prototype.restoreRecoveryPoint = async function (recentId) {
+    if (!await this.confirmAction({
+      title: "Restore recovery point",
+      message: "Replace the current browser mind with this recovery point?",
+      confirmLabel: "Restore",
+      danger: true
+    })) return;
     this.closeRecovery();
     this.openRecentMind(recentId);
   };
@@ -2191,15 +2349,23 @@
     return true;
   };
 
-  Controller.prototype.applyWelcomeTemplate = function (template, options) {
+  Controller.prototype.applyWelcomeTemplate = async function (template, options) {
     if (template === "tutorial" && RingMapChart.tutorialSnapshot) return this.applyTutorialSnapshot(options);
     const tree = welcomeTemplateTree(template);
     if (!tree) return false;
     const hasWork = Object.keys(this.mind.nodes).length > 1 || this.currentMindNode()?.label !== "Chart Title";
-    if (hasWork && !confirm("Replace current mind with this starter template?")) return false;
+    if (hasWork && !await this.confirmAction({
+      title: "Load template",
+      message: "Replace the current mind with this starter template?",
+      confirmLabel: "Replace",
+      danger: true
+    })) return false;
     this.pushUndoSnapshot();
     this.store = model.createStore(model.cloneAsRoot(tree));
     this.mind = model.createMindFromTree(this.store.tree);
+    this.workspaceId = workspaceId();
+    this.workspaceUpdatedAt = new Date().toISOString();
+    this.workspaceSync = storage.normalizeWorkspaceSync(null);
     this.maps = [this.createMap(model.ROOT_ID, this.store.tree.label)];
     this.activeMapId = this.maps[0].id;
     this.downMapStack = [];
@@ -2217,12 +2383,21 @@
     return true;
   };
 
-  Controller.prototype.applyTutorialSnapshot = function (options) {
+  Controller.prototype.applyTutorialSnapshot = async function (options) {
     const snapshot = JSON.parse(JSON.stringify(RingMapChart.tutorialSnapshot));
     const hasWork = Object.keys(this.mind.nodes).length > 1 || this.currentMindNode()?.label !== "Chart Title";
-    if (hasWork && !confirm("Replace current mind with this tutorial?")) return false;
+    if (hasWork && !await this.confirmAction({
+      title: "Load tutorial",
+      message: "Replace the current mind with the tutorial mind?",
+      confirmLabel: "Replace",
+      danger: true
+    })) return false;
     this.pushUndoSnapshot();
     this.mind = snapshot.mind;
+    this.workspaceId = snapshot.workspaceId || workspaceId();
+    this.workspaceUpdatedAt = snapshot.updatedAt || new Date().toISOString();
+    this.authorProfile = authorProfileForWorkspace(snapshot.authorProfile, this.authorProfile);
+    this.workspaceSync = storage.normalizeWorkspaceSync(snapshot.sync);
     this.maps = snapshot.maps;
     this.activeMapId = this.maps.some((map) => map.id === snapshot.activeMapId) ? snapshot.activeMapId : this.maps[0].id;
     this.downMapStack = [];
@@ -2244,8 +2419,8 @@
     return true;
   };
 
-  Controller.prototype.startTutorial = function () {
-    if (!this.applyWelcomeTemplate("tutorial", { closeWelcome: true })) return;
+  Controller.prototype.startTutorial = async function () {
+    if (!await this.applyWelcomeTemplate("tutorial", { closeWelcome: true })) return;
     this.createTutorialChapterMaps();
     this.updateStatus("Tutorial loaded. Ctrl+click root node to begin.");
   };
@@ -2648,13 +2823,17 @@
     this.updateStatus("Mind copy saved");
   };
 
-  Controller.prototype.mindExportPayload = function () {
-    if (this.noteSaveTimer) this.saveFocusedNote();
+  Controller.prototype.workspaceSnapshot = function (options) {
     this.captureActiveMap();
+    if (options && options.touchUpdatedAt) this.workspaceUpdatedAt = new Date().toISOString();
     return {
       type: "concen-mind",
-      version: 1,
-      exportedAt: new Date().toISOString(),
+      version: 2,
+      schemaVersion: 2,
+      workspaceId: this.workspaceId,
+      updatedAt: this.workspaceUpdatedAt,
+      authorProfile: this.authorProfile,
+      sync: this.workspaceSync,
       mind: this.mind,
       maps: this.maps,
       activeMapId: this.activeMapId,
@@ -2665,6 +2844,11 @@
     };
   };
 
+  Controller.prototype.mindExportPayload = function () {
+    if (this.noteSaveTimer) this.saveFocusedNote();
+    return Object.assign({ exportedAt: new Date().toISOString() }, this.workspaceSnapshot({ touchUpdatedAt: true }));
+  };
+
   Controller.prototype.applyMindPayload = function (parsed) {
     const previous = localStorage.getItem(config.storageKey);
     try {
@@ -2672,6 +2856,11 @@
       const loaded = storage.load();
       if (!loaded) throw new Error("Invalid mind file");
       this.rememberCurrentMind();
+      this.workspaceId = loaded.workspaceId || workspaceId();
+      this.workspaceUpdatedAt = loaded.updatedAt || new Date().toISOString();
+      this.authorProfile = authorProfileForWorkspace(loaded.authorProfile, this.authorProfile);
+      saveAuthorProfile(this.authorProfile);
+      this.workspaceSync = storage.normalizeWorkspaceSync(loaded.sync);
       this.mind = loaded.mind;
       this.maps = loaded.maps;
       this.activeMapId = loaded.activeMapId;
@@ -2722,6 +2911,7 @@
     this.githubSync = next;
     saveGithubSyncConfig(this.githubSync);
     this.syncGithubControls();
+    this.syncTrustDataControls();
     this.updateStatus("GitHub sync saved");
   };
 
@@ -2761,6 +2951,7 @@
         }), this.mind);
         saveGithubSyncConfig(this.githubSync);
         this.syncGithubControls();
+        this.syncTrustDataControls();
         this.updateStatus(this.githubSync.token ? "GitHub settings opened" : "GitHub settings opened; token needed");
       } catch (error) {
         this.updateStatus("GitHub settings open failed");
@@ -2770,53 +2961,114 @@
     });
   };
 
-  Controller.prototype.disconnectGithubSync = function () {
-    if (!confirm("Disconnect GitHub sync from this browser?")) return;
+  Controller.prototype.disconnectGithubSync = async function () {
+    if (!await this.confirmAction({
+      title: "Disconnect GitHub sync",
+      message: "Remove this browser's GitHub sync settings? Your mind data stays in ConCen.",
+      confirmLabel: "Disconnect",
+      danger: true
+    })) return;
     this.githubSync = defaultGithubSyncConfig(this.mind);
+    this.workspaceSync = storage.normalizeWorkspaceSync(null);
     saveGithubSyncConfig(this.githubSync);
+    this.save();
     this.syncGithubControls();
+    this.syncTrustDataControls();
     this.updateStatus("GitHub sync disconnected");
   };
 
-  Controller.prototype.pushMindToGithub = function () {
+  Controller.prototype.pushMindToGithub = async function () {
     const sync = this.readGithubSyncSettings();
     if (!sync) return;
+    this.rememberCurrentMind();
     const payload = this.mindExportPayload();
     const content = JSON.stringify(payload, null, 2) + "\n";
     this.updateStatus("Pushing to GitHub");
-    githubGetContent(sync).then((remote) => {
-      if (remote && sync.sha && remote.sha !== sync.sha && !confirm("Remote mind changed since last pull. Push over remote copy?")) {
-        this.updateStatus("GitHub push cancelled");
-        return null;
+    try {
+      const remote = await githubGetContent(sync);
+      if (remote && sync.sha && remote.sha !== sync.sha) {
+        const action = await this.chooseAction({
+          eyebrow: "GitHub Sync",
+          title: "Remote changed",
+          message: "The remote mind changed since your last pull. Choose how to protect your local work.",
+          cancelValue: "",
+          actions: [
+            { label: "Download Backup", value: "backup" },
+            { label: "Pull First", value: "pull", kind: "primary" },
+            { label: "Overwrite Remote", value: "overwrite", kind: "danger" },
+            { label: "Cancel", value: "" }
+          ]
+        });
+        if (action === "backup") {
+          this.exportCurrentRecoveryBackup();
+          this.updateStatus("Backup downloaded; GitHub push cancelled");
+          return;
+        }
+        if (action === "pull") {
+          this.updateStatus("Pull remote before pushing");
+          this.githubSync = Object.assign({}, sync, { sha: remote.sha || "" });
+          saveGithubSyncConfig(this.githubSync);
+          this.syncGithubControls();
+          return;
+        }
+        if (action !== "overwrite") {
+          this.updateStatus("GitHub push cancelled");
+          return;
+        }
       }
-      return githubPutContent(sync, content, remote && remote.sha, `Update ${sync.path}`);
-    }).then((result) => {
-      if (!result) return;
-      this.githubSync = Object.assign({}, sync, { sha: result.content && result.content.sha || "" });
+      if (remote && !sync.sha && !await this.confirmAction({
+        eyebrow: "GitHub Sync",
+        title: "Remote mind exists",
+        message: "Push over the existing remote copy?",
+        confirmLabel: "Overwrite",
+        danger: true
+      })) {
+        this.updateStatus("GitHub push cancelled");
+        return;
+      }
+      const result = await githubPutContent(sync, content, remote && remote.sha, `Update ${sync.path}`);
+      const sha = result.content && result.content.sha || "";
+      const now = new Date().toISOString();
+      this.githubSync = Object.assign({}, sync, { sha });
+      this.workspaceSync = storage.normalizeWorkspaceSync({ provider: "github", lastRemoteSha: sha, lastPushedAt: now, lastPulledAt: this.workspaceSync.lastPulledAt });
       saveGithubSyncConfig(this.githubSync);
+      this.save();
       this.syncGithubControls();
+      this.syncTrustDataControls();
       this.updateStatus("GitHub push complete");
-    }).catch((error) => {
+    } catch (error) {
       this.updateStatus(githubErrorMessage(error, "GitHub push failed"));
-    });
+    }
   };
 
-  Controller.prototype.pullMindFromGithub = function () {
+  Controller.prototype.pullMindFromGithub = async function () {
     const sync = this.readGithubSyncSettings();
     if (!sync) return;
-    if (!confirm("Pull GitHub mind and replace current browser mind?")) return;
+    if (!await this.confirmAction({
+      eyebrow: "GitHub Sync",
+      title: "Pull from GitHub",
+      message: "Replace the current browser mind with the remote GitHub mind?",
+      confirmLabel: "Pull",
+      danger: true
+    })) return;
+    this.rememberCurrentMind();
     this.updateStatus("Pulling from GitHub");
-    githubGetContent(sync).then((remote) => {
+    try {
+      const remote = await githubGetContent(sync);
       if (!remote || !remote.content) throw new Error("GitHub file not found");
       const parsed = JSON.parse(decodeBase64Unicode(remote.content));
       if (!this.applyMindPayload(parsed)) throw new Error("Invalid GitHub mind");
+      const now = new Date().toISOString();
       this.githubSync = Object.assign({}, sync, { sha: remote.sha || "" });
+      this.workspaceSync = storage.normalizeWorkspaceSync({ provider: "github", lastRemoteSha: remote.sha || "", lastPulledAt: now, lastPushedAt: this.workspaceSync.lastPushedAt });
       saveGithubSyncConfig(this.githubSync);
+      this.save();
       this.syncGithubControls();
+      this.syncTrustDataControls();
       this.updateStatus("GitHub pull complete");
-    }).catch((error) => {
+    } catch (error) {
       this.updateStatus(githubErrorMessage(error, "GitHub pull failed"));
-    });
+    }
   };
 
   Controller.prototype.readGithubSyncSettings = function () {
@@ -2830,9 +3082,14 @@
     return next;
   };
 
-  Controller.prototype.clearRecentMinds = function (source) {
+  Controller.prototype.clearRecentMinds = async function (source) {
     const recoveryLabel = source === "recovery";
-    if (!confirm(recoveryLabel ? "Clear all recovery points?" : "Clear recent minds?")) return;
+    if (!await this.confirmAction({
+      title: recoveryLabel ? "Clear recovery points" : "Clear recents",
+      message: recoveryLabel ? "Clear all recovery points stored in this browser?" : "Clear all recent minds stored in this browser?",
+      confirmLabel: "Clear",
+      danger: true
+    })) return;
     this.recentMinds = [];
     saveRecentMinds(this.recentMinds);
     this.renderRecovery();
@@ -2841,23 +3098,14 @@
   };
 
   Controller.prototype.rememberCurrentMind = function () {
-    this.captureActiveMap();
     const label = this.mind.nodes[this.mind.rootId]?.label || "Untitled Mind";
-    const snapshot = cloneSnapshot({
-      mind: this.mind,
-      maps: this.maps,
-      activeMapId: this.activeMapId,
-      appearance: this.appearance,
-      theme: this.theme,
-      customTheme: this.customTheme,
-      branchColors: this.branchColors
-    });
+    const snapshot = cloneSnapshot(this.workspaceSnapshot({ touchUpdatedAt: false }));
     const raw = JSON.stringify(snapshot);
     if (raw.length > config.limits.maxStoredBytes) return false;
     if (this.recentMinds[0] && JSON.stringify(this.recentMinds[0].snapshot) === raw) return "duplicate";
     const id = "recent-" + Date.now().toString(36);
     const next = [
-      { id, label, updatedAt: new Date().toISOString(), snapshot }
+      { id, label, updatedAt: new Date().toISOString(), authorProfile: this.authorProfile, schemaVersion: 2, snapshot }
     ].concat(this.recentMinds).slice(0, RECENT_MAX_ITEMS);
     if (!saveRecentMinds(next)) return false;
     this.recentMinds = loadRecentMinds();
@@ -2876,6 +3124,11 @@
       localStorage.setItem(config.storageKey, JSON.stringify(item.snapshot));
       const loaded = storage.load();
       if (!loaded) throw new Error("Invalid recent mind");
+      this.workspaceId = loaded.workspaceId || workspaceId();
+      this.workspaceUpdatedAt = loaded.updatedAt || new Date().toISOString();
+      this.authorProfile = authorProfileForWorkspace(loaded.authorProfile, this.authorProfile);
+      saveAuthorProfile(this.authorProfile);
+      this.workspaceSync = storage.normalizeWorkspaceSync(loaded.sync);
       this.mind = loaded.mind;
       this.maps = loaded.maps;
       this.activeMapId = loaded.activeMapId;
@@ -3332,7 +3585,9 @@
 
   function recoveryItemDetail(item) {
     const snapshot = item && item.snapshot || {};
-    return recoveryStats(snapshot.mind, snapshot.maps, item && item.updatedAt);
+    const author = item && item.authorProfile && item.authorProfile.displayName ? " · " + item.authorProfile.displayName : "";
+    const schema = item && item.schemaVersion ? " · schema v" + item.schemaVersion : "";
+    return recoveryStats(snapshot.mind, snapshot.maps, item && item.updatedAt) + author + schema;
   }
 
   function shortDate(value) {
@@ -3359,6 +3614,34 @@
 
   function defaultGithubSyncConfig(mind) {
     return { owner: "", repo: "", branch: "main", path: defaultGithubPath(mind), token: "", sha: "" };
+  }
+
+  function workspaceId() {
+    return "workspace-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+  }
+
+  function loadAuthorProfile() {
+    try {
+      const raw = localStorage.getItem(AUTHOR_PROFILE_KEY);
+      return storage.normalizeAuthorProfile(raw ? JSON.parse(raw) : null);
+    } catch (error) {
+      return storage.normalizeAuthorProfile(null);
+    }
+  }
+
+  function authorProfileForWorkspace(candidate, fallback) {
+    const normalized = storage.normalizeAuthorProfile(candidate);
+    if (normalized.displayName) return normalized;
+    return storage.normalizeAuthorProfile(fallback || normalized);
+  }
+
+  function saveAuthorProfile(profile) {
+    try {
+      localStorage.setItem(AUTHOR_PROFILE_KEY, JSON.stringify(storage.normalizeAuthorProfile(profile)));
+    } catch (error) {
+      return false;
+    }
+    return true;
   }
 
   function githubSyncSettingsPayload(sync) {
@@ -3799,6 +4082,7 @@
 
   function styleTokens(style, dark) {
     if (style === "papery") return dark ? darkPaperyTokens() : lightPaperyTokens();
+    if (style === "dust") return dustTokens(dark);
     if (style === "blueprint") return blueprintTokens();
     if (style === "terminal") return terminalTokens();
     if (style === "schematic") return schematicTokens(dark);
@@ -3995,6 +4279,20 @@
       "shadow-md": "0 10px 24px rgba(0, 0, 0, 0.3)",
       "shadow-lg": "0 22px 54px rgba(0, 0, 0, 0.42)",
       "node-shadow": "drop-shadow(0 7px 12px rgba(0, 0, 0, 0.32))"
+    };
+  }
+
+  function dustTokens(dark) {
+    return dark ? {
+      "shadow-sm": "0 1px 1px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(245, 222, 179, 0.035) inset",
+      "shadow-md": "0 10px 22px rgba(0, 0, 0, 0.34)",
+      "shadow-lg": "0 22px 52px rgba(0, 0, 0, 0.44)",
+      "node-shadow": "drop-shadow(0 8px 12px rgba(0, 0, 0, 0.34))"
+    } : {
+      "shadow-sm": "0 1px 1px rgba(103, 82, 48, 0.1), 0 1px 0 rgba(255, 255, 255, 0.5) inset",
+      "shadow-md": "0 9px 20px rgba(103, 82, 48, 0.13)",
+      "shadow-lg": "0 20px 46px rgba(103, 82, 48, 0.18)",
+      "node-shadow": "drop-shadow(0 6px 9px rgba(103, 82, 48, 0.15))"
     };
   }
 

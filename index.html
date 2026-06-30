@@ -84,7 +84,7 @@
             <span class="visually-hidden">Shortcuts</span>
           </button>
           <details class="mind-menu command-menu">
-            <summary class="icon-button" data-icon="◌" title="Mind actions" aria-label="Mind actions">
+            <summary class="icon-button" data-icon="☰" title="Mind actions" aria-label="Mind actions">
               <span class="visually-hidden">Mind</span>
             </summary>
             <div class="command-panel">
@@ -92,6 +92,25 @@
               <button id="saveMindButton" type="button" data-icon="✓">Save Mind</button>
               <button id="exportMindButton" type="button" data-icon="⇧">Save Copy</button>
               <button id="recoveryButton" type="button" data-icon="↺">Recovery</button>
+              <details class="trust-data">
+                <summary data-icon="◇">Trust & Data</summary>
+                <div class="trust-data-panel" aria-label="Trust and data controls">
+                  <div id="trustDataSummary" class="trust-data-summary" aria-live="polite"></div>
+                  <label>
+                    <span>Author</span>
+                    <input id="authorDisplayNameInput" type="text" autocomplete="off" placeholder="Your name">
+                  </label>
+                  <div class="trust-actions">
+                    <button id="saveAuthorProfileButton" type="button" data-icon="✓">Save Author</button>
+                    <button id="trustRecoveryButton" type="button" data-icon="+">Recovery Point</button>
+                    <button id="trustBackupButton" type="button" data-icon="⇧">Download Backup</button>
+                    <button id="trustOpenRecoveryButton" type="button" data-icon="↺">Open Recovery</button>
+                    <button id="trustPushButton" type="button" data-icon="⇧">Push</button>
+                    <button id="trustPullButton" type="button" data-icon="⇩">Pull</button>
+                    <button id="trustDisconnectButton" type="button" class="quiet-danger" data-icon="×">Disconnect</button>
+                  </div>
+                </div>
+              </details>
               <label class="import-mind" data-icon="⇩">
                 <span>Open Mind</span>
                 <input id="importMindInput" type="file" accept="application/json,.json">
@@ -368,6 +387,16 @@
             <button id="recoveryClearButton" type="button" class="quiet-danger" data-icon="⌫">Clear Recovery Points</button>
           </div>
           <div id="recoveryList" class="recovery-list"></div>
+        </div>
+      </div>
+      <div id="appDialog" class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="appDialogTitle" hidden>
+        <div class="app-dialog-panel">
+          <div class="app-dialog-head">
+            <span id="appDialogEyebrow" class="welcome-label">Confirm</span>
+            <h2 id="appDialogTitle">Confirm action</h2>
+          </div>
+          <p id="appDialogMessage"></p>
+          <div id="appDialogActions" class="app-dialog-actions"></div>
         </div>
       </div>
       <div id="welcomeDialog" class="welcome-dialog" role="dialog" aria-modal="true" aria-label="Welcome to ConCen" hidden>

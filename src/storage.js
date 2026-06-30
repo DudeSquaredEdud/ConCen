@@ -17,6 +17,13 @@
       if (Array.isArray(saved.maps)) return normalizeWorkspace(saved);
       const map = normalizeMap(saved, "map-1");
       return map ? {
+	        type: "concen-mind",
+	        version: 2,
+	        schemaVersion: 2,
+	        workspaceId: normalizeWorkspaceId(saved.workspaceId),
+	        updatedAt: normalizeTimestamp(saved.updatedAt || saved.exportedAt),
+	        authorProfile: normalizeAuthorProfile(saved.authorProfile),
+	        sync: normalizeWorkspaceSync(saved.sync),
 	        mind: model.createMindFromTree(map.tree),
 	        maps: [mapFromTreeMap(map, model.ROOT_ID)],
 	        activeMapId: map.id,
@@ -91,6 +98,13 @@
     if (!maps.length) return null;
     const activeMapId = maps.some((map) => map.id === saved.activeMapId) ? saved.activeMapId : maps[0].id;
     return {
+      type: "concen-mind",
+      version: 2,
+      schemaVersion: 2,
+      workspaceId: normalizeWorkspaceId(saved.workspaceId),
+      updatedAt: normalizeTimestamp(saved.updatedAt || saved.exportedAt),
+      authorProfile: normalizeAuthorProfile(saved.authorProfile),
+      sync: normalizeWorkspaceSync(saved.sync),
       mind,
       maps,
       activeMapId,
@@ -113,6 +127,35 @@
       idCounter: Math.max(Number(saved.idCounter) || 1, model.nextId(tree)),
       viewMode: normalizeViewMode(saved.viewMode, Number(saved.ring) >= 50 ? "radial" : "tree"),
       spacing: saved.spacing || null
+    };
+  }
+
+  function normalizeWorkspaceId(value) {
+    const clean = utils.cleanId(value, "");
+    return clean || "workspace-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+  }
+
+  function normalizeTimestamp(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+  }
+
+  function normalizeAuthorProfile(input) {
+    const source = input && typeof input === "object" ? input : {};
+    const displayName = utils.cleanLabel(source.displayName) || "";
+    return {
+      id: utils.cleanId(source.id, "") || "author-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8),
+      displayName
+    };
+  }
+
+  function normalizeWorkspaceSync(input) {
+    const sync = input && typeof input === "object" ? input : {};
+    return {
+      provider: sync.provider === "github" ? "github" : "",
+      lastRemoteSha: /^[0-9a-f]{40}$/i.test(String(sync.lastRemoteSha || "")) ? String(sync.lastRemoteSha) : "",
+      lastPulledAt: sync.lastPulledAt ? normalizeTimestamp(sync.lastPulledAt) : "",
+      lastPushedAt: sync.lastPushedAt ? normalizeTimestamp(sync.lastPushedAt) : ""
     };
   }
 
@@ -267,6 +310,8 @@
     normalizeBackgroundImageData,
     normalizeNavigationMode,
     normalizeBranchColors,
-    normalizeCustomTheme
+    normalizeCustomTheme,
+    normalizeAuthorProfile,
+    normalizeWorkspaceSync
   };
 })(window);

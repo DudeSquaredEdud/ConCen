@@ -407,6 +407,38 @@ body {
     var(--surface-raised);
 }
 
+:root[data-style="dust"] body {
+  background:
+    radial-gradient(circle at 18% -12%, color-mix(in srgb, var(--root-node-fill) 10%, transparent), transparent 30rem),
+    radial-gradient(circle at 80% 10%, color-mix(in srgb, var(--muted) 12%, transparent), transparent 28rem),
+    linear-gradient(115deg, color-mix(in srgb, var(--canvas-bg) 56%, transparent), transparent 42rem),
+    var(--bg);
+}
+
+:root[data-style="dust"] .toolbar,
+:root[data-style="dust"] .toolbar-group,
+:root[data-style="dust"] .settings-panel,
+:root[data-style="dust"] .command-panel,
+:root[data-style="dust"] .theme-controls,
+:root[data-style="dust"] .spacing-controls,
+:root[data-style="dust"] .note-sidebar,
+:root[data-style="dust"] .node-action-bar,
+:root[data-style="dust"] .custom-select-list,
+:root[data-style="dust"] .layout-settings-panel,
+:root[data-style="dust"] .app-dialog-panel,
+:root[data-style="dust"] .recovery-panel,
+:root[data-style="dust"] .welcome-panel,
+:root[data-style="dust"] .shortcut-panel {
+  background:
+    radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.08), transparent 10rem),
+    repeating-radial-gradient(circle at 28% 18%, color-mix(in srgb, var(--muted) 7%, transparent) 0 1px, transparent 1px 5px),
+    color-mix(in srgb, var(--surface-raised) 94%, transparent);
+}
+
+:root[data-style="dust"] .node-box {
+  stroke-dasharray: 1 3;
+}
+
 :root[data-style="blueprint"] .toolbar,
 :root[data-style="blueprint"] .toolbar-group,
 :root[data-style="blueprint"] .settings-panel,
@@ -617,19 +649,6 @@ summary,
     background-position: 0% 40%, 100% 10%, 40% 90%, 0 0, 0 0, 0 0;
   }
 }
-
-@keyframes wavesFlow {
-  0% {
-    transform: translate3d(-3%, -1%, 0) scaleX(1.08) scaleY(1);
-  }
-  50% {
-    transform: translate3d(3%, 1.5%, 0) scaleX(1.16) scaleY(1.04);
-  }
-  100% {
-    transform: translate3d(-3%, -1%, 0) scaleX(1.08) scaleY(1);
-  }
-}
-
 
 button:focus-visible,
 select:focus-visible,
@@ -848,7 +867,8 @@ summary:focus-visible,
 button,
 .import-mind,
 .import-theme,
-.settings-menu summary {
+.settings-menu summary,
+.command-menu > summary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -892,7 +912,18 @@ button,
   min-width: 30px;
 }
 
+.mind-menu > summary.icon-button {
+  width: 34px;
+  min-width: 34px;
+}
+
+.mind-menu > summary.icon-button::before {
+  font-size: 20px;
+  font-weight: 820;
+}
+
 .command-panel button::before,
+.trust-data > summary::before,
 .github-sync > summary::before,
 .import-mind::before,
 .github-import-settings::before,
@@ -913,12 +944,14 @@ button:hover,
 .import-mind:hover,
 .github-import-settings:hover,
 .import-theme:hover,
-.settings-menu summary:hover {
+.settings-menu summary:hover,
+.command-menu > summary:hover {
   background: var(--control-hover);
 }
 
 button:active,
-.settings-menu summary:active {
+.settings-menu summary:active,
+.command-menu > summary:active {
   background: var(--control-pressed);
   transform: translateY(1px);
 }
@@ -933,6 +966,18 @@ button:disabled:hover {
 }
 
 .quiet-danger {
+  color: var(--danger-ink);
+}
+
+.button-primary {
+  border-color: color-mix(in srgb, var(--focus) 50%, var(--glass-border));
+  background: color-mix(in srgb, var(--focus) 18%, var(--control));
+  color: var(--ink);
+}
+
+.button-danger {
+  border-color: color-mix(in srgb, var(--danger-ink) 36%, var(--glass-border));
+  background: color-mix(in srgb, var(--danger-ink) 10%, var(--control));
   color: var(--danger-ink);
 }
 
@@ -980,6 +1025,9 @@ button:disabled:hover {
   display: grid;
   gap: 12px;
   min-width: 340px;
+  max-height: min(720px, calc(100vh - 96px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 12px;
   border: 1px solid var(--glass-border);
   border-radius: 18px;
@@ -996,9 +1044,15 @@ button:disabled:hover {
   gap: 6px;
 }
 
+.settings-panel,
+.command-panel {
+  scrollbar-gutter: stable;
+}
+
 .command-panel button,
 .command-panel .import-mind,
 .command-panel .github-import-settings,
+.command-panel .trust-data > summary,
 .command-panel .github-sync > summary {
   width: 100%;
   justify-content: flex-start;
@@ -1007,11 +1061,13 @@ button:disabled:hover {
   line-height: 1;
 }
 
-.github-sync {
+.github-sync,
+.trust-data {
   width: 100%;
 }
 
-.github-sync > summary {
+.github-sync > summary,
+.trust-data > summary {
   display: inline-flex;
   align-items: center;
   min-height: 34px;
@@ -1029,11 +1085,13 @@ button:disabled:hover {
   white-space: nowrap;
 }
 
-.github-sync > summary::-webkit-details-marker {
+.github-sync > summary::-webkit-details-marker,
+.trust-data > summary::-webkit-details-marker {
   display: none;
 }
 
-.github-sync-panel {
+.github-sync-panel,
+.trust-data-panel {
   display: grid;
   gap: 7px;
   padding: 8px;
@@ -1042,7 +1100,8 @@ button:disabled:hover {
   background: var(--surface-recessed);
 }
 
-.github-sync-panel label {
+.github-sync-panel label,
+.trust-data-panel label {
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
   align-items: center;
@@ -1059,7 +1118,8 @@ button:disabled:hover {
   font-weight: 650;
 }
 
-.github-sync-panel input {
+.github-sync-panel input,
+.trust-data-panel input {
   min-width: 0;
   height: 28px;
   border: 1px solid var(--glass-border);
@@ -1069,7 +1129,8 @@ button:disabled:hover {
   background: var(--field);
 }
 
-.github-sync-actions {
+.github-sync-actions,
+.trust-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
@@ -1157,6 +1218,35 @@ button:disabled:hover {
   background: var(--field);
   color: var(--ink);
   box-shadow: var(--shadow-sm);
+}
+
+.theme-field input {
+  min-width: 0;
+  height: 30px;
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 0 9px;
+  background: var(--field);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+.trust-data-summary {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+  padding: 7px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 7px;
+  background: var(--field);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.trust-actions button {
+  min-height: 28px;
 }
 
 select.native-select-hidden {
@@ -1801,7 +1891,8 @@ select.native-select-hidden {
 .command-palette,
 .shortcut-sheet,
 .welcome-dialog,
-.recovery-dialog {
+.recovery-dialog,
+.app-dialog {
   position: fixed;
   inset: 0;
   z-index: 20;
@@ -1818,14 +1909,16 @@ select.native-select-hidden {
 .command-palette[hidden],
 .shortcut-sheet[hidden],
 .welcome-dialog[hidden],
-.recovery-dialog[hidden] {
+.recovery-dialog[hidden],
+.app-dialog[hidden] {
   display: none;
 }
 
 .palette-panel,
 .shortcut-panel,
 .welcome-panel,
-.recovery-panel {
+.recovery-panel,
+.app-dialog-panel {
   width: min(620px, calc(100vw - 28px));
   overflow: hidden;
   border: 1px solid var(--glass-border);
@@ -1846,6 +1939,49 @@ select.native-select-hidden {
 .recovery-dialog {
   align-items: center;
   padding: 24px;
+}
+
+.app-dialog {
+  align-items: center;
+  padding: 24px;
+}
+
+.app-dialog-panel {
+  display: grid;
+  gap: 14px;
+  width: min(430px, calc(100vw - 28px));
+  padding: 16px;
+}
+
+.app-dialog-head {
+  display: grid;
+  gap: 6px;
+}
+
+.app-dialog-head h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.app-dialog-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 620;
+  line-height: 1.45;
+}
+
+.app-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.app-dialog-actions button {
+  min-width: 86px;
 }
 
 .shortcut-sheet {
@@ -2268,6 +2404,50 @@ select.native-select-hidden {
   animation: spiritsDrift 18s ease-in-out infinite;
 }
 
+:root[data-background="dunes"] #chartCanvas {
+  --dune-contour-a: color-mix(in srgb, var(--ring-guide) 44%, transparent);
+  --dune-contour-b: color-mix(in srgb, var(--muted) 24%, transparent);
+  --dune-contour-c: color-mix(in srgb, var(--canvas-grid) 72%, transparent);
+  --dune-wash-a: color-mix(in srgb, var(--ring-guide) 24%, transparent);
+  --dune-wash-b: color-mix(in srgb, var(--muted) 16%, transparent);
+  --dune-wash-c: color-mix(in srgb, var(--surface-solid) 42%, transparent);
+  --dune-wash-d: color-mix(in srgb, var(--canvas-grid) 58%, transparent);
+  --dune-sweep-a: color-mix(in srgb, var(--ring-guide) 22%, transparent);
+  --dune-sweep-b: color-mix(in srgb, var(--surface-solid) 34%, transparent);
+  --dune-base-a: color-mix(in srgb, var(--surface-solid) 50%, transparent);
+  --dune-base-b: color-mix(in srgb, var(--ring-guide) 16%, transparent);
+  --dune-base-c: color-mix(in srgb, var(--canvas-bg) 62%, transparent);
+  background:
+    radial-gradient(ellipse 104rem 42rem at 26% 86%, transparent 0 16%, var(--dune-contour-a) 16.6% 17.2%, transparent 17.8% 29%, var(--dune-contour-b) 29.6% 30.2%, transparent 30.8% 43%, var(--dune-contour-c) 43.6% 44.2%, transparent 44.8% 58%, var(--dune-contour-a) 58.6% 59.2%, transparent 60%),
+    radial-gradient(ellipse 118rem 48rem at 76% 78%, transparent 0 20%, var(--dune-contour-c) 20.6% 21.2%, transparent 21.8% 36%, var(--dune-contour-a) 36.6% 37.2%, transparent 37.8% 53%, var(--dune-contour-b) 53.6% 54.2%, transparent 55%),
+    radial-gradient(ellipse 72rem 28rem at 50% 32%, var(--dune-wash-a) 0 30%, transparent 72%),
+    radial-gradient(ellipse 84rem 36rem at 18% 78%, var(--dune-wash-b) 0 34%, transparent 76%),
+    radial-gradient(ellipse 80rem 30rem at 88% 20%, var(--dune-wash-c) 0 28%, transparent 74%),
+    radial-gradient(ellipse 96rem 42rem at 54% 98%, var(--dune-wash-d) 0 34%, transparent 78%),
+    linear-gradient(18deg, transparent 0 8%, var(--dune-sweep-a) 26%, transparent 48%, var(--dune-sweep-b) 66%, transparent 90%),
+    linear-gradient(108deg, var(--dune-base-a) 0%, var(--dune-base-b) 42%, var(--dune-base-c) 100%),
+    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
+    var(--canvas-bg);
+  background-size: auto, auto, auto, auto, auto, auto, auto, auto, 56px 56px, 56px 56px, auto;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat, repeat;
+}
+
+:root[data-theme="dark"][data-background="dunes"] #chartCanvas {
+  --dune-contour-a: color-mix(in srgb, var(--ring-guide) 52%, transparent);
+  --dune-contour-b: color-mix(in srgb, var(--muted) 22%, transparent);
+  --dune-contour-c: color-mix(in srgb, var(--canvas-grid) 92%, transparent);
+  --dune-wash-a: color-mix(in srgb, var(--ring-guide) 26%, transparent);
+  --dune-wash-b: color-mix(in srgb, var(--muted) 14%, transparent);
+  --dune-wash-c: color-mix(in srgb, var(--surface-solid) 32%, transparent);
+  --dune-wash-d: color-mix(in srgb, #000 28%, transparent);
+  --dune-sweep-a: color-mix(in srgb, var(--ring-guide) 26%, transparent);
+  --dune-sweep-b: color-mix(in srgb, var(--muted) 14%, transparent);
+  --dune-base-a: color-mix(in srgb, var(--canvas-bg) 72%, transparent);
+  --dune-base-b: color-mix(in srgb, var(--ring-guide) 18%, transparent);
+  --dune-base-c: color-mix(in srgb, #000 32%, var(--canvas-bg));
+}
+
 :root[data-theme="dark"][data-background="spirits"] #chartCanvas {
   background:
     radial-gradient(ellipse at 18% 24%, rgba(34, 211, 238, 0.3), transparent 34rem),
@@ -2279,32 +2459,16 @@ select.native-select-hidden {
   background-size: 90rem 48rem, 86rem 52rem, 80rem 44rem, 48px 48px, 48px 48px, auto;
 }
 
-:root[data-background="waves"] .canvas-wrap::before {
-  display: block;
+:root[data-background="circles"] #chartCanvas {
   background:
-    radial-gradient(ellipse 92% 9% at 18% 43%, transparent 0 10%, rgba(125, 211, 252, 0.12) 28%, rgba(125, 211, 252, 0.34) 45%, rgba(125, 211, 252, 0.16) 60%, transparent 84%),
-    radial-gradient(ellipse 104% 11% at 68% 54%, transparent 0 12%, rgba(255, 255, 255, 0.16) 30%, rgba(255, 255, 255, 0.34) 42%, rgba(99, 102, 241, 0.25) 60%, transparent 86%),
-    radial-gradient(ellipse 88% 8% at 38% 64%, transparent 0 10%, rgba(14, 165, 233, 0.12) 30%, rgba(14, 165, 233, 0.32) 46%, rgba(14, 165, 233, 0.16) 62%, transparent 86%);
-  filter: blur(8px);
-  opacity: 0.72;
-  mix-blend-mode: screen;
-  animation: wavesFlow 26s ease-in-out infinite;
-}
-
-:root[data-theme="dark"][data-background="waves"] .canvas-wrap::before {
-  background:
-    radial-gradient(ellipse 92% 9% at 18% 43%, transparent 0 10%, rgba(125, 211, 252, 0.14) 28%, rgba(125, 211, 252, 0.44) 45%, rgba(125, 211, 252, 0.2) 60%, transparent 84%),
-    radial-gradient(ellipse 104% 11% at 68% 54%, transparent 0 12%, rgba(255, 255, 255, 0.18) 30%, rgba(255, 255, 255, 0.38) 42%, rgba(99, 102, 241, 0.34) 60%, transparent 86%),
-    radial-gradient(ellipse 88% 8% at 38% 64%, transparent 0 10%, rgba(14, 165, 233, 0.16) 30%, rgba(14, 165, 233, 0.4) 46%, rgba(14, 165, 233, 0.22) 62%, transparent 86%);
-  opacity: 0.9;
-}
-
-:root[data-background="waves"] #chartCanvas {
-  background:
+    radial-gradient(circle at 50% 48%, color-mix(in srgb, var(--surface-solid) 20%, transparent), transparent 28rem),
+    repeating-radial-gradient(circle at 50% 48%, color-mix(in srgb, var(--muted) 12%, transparent) 0 1px, transparent 1px 9px),
+    repeating-radial-gradient(circle at 50% 48%, transparent 0 34px, color-mix(in srgb, var(--ring-guide) 20%, transparent) 35px 36px, transparent 37px 70px),
+    radial-gradient(circle at 50% 48%, transparent 0 8rem, color-mix(in srgb, var(--canvas-bg) 32%, transparent) 30rem),
     linear-gradient(var(--canvas-grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
-    transparent;
-  background-size: 48px 48px, 48px 48px, auto;
+    var(--canvas-bg);
+  background-size: auto, auto, auto, auto, 48px 48px, 48px 48px, auto;
 }
 
 :root[data-background="image"] #chartCanvas {
@@ -2738,6 +2902,35 @@ select.native-select-hidden {
     linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
     var(--canvas-bg);
   background-size: auto, 48px 48px, 48px 48px, auto;
+}
+
+:root[data-view="document"][data-background="dunes"] #chartCanvas {
+  background:
+    radial-gradient(ellipse 104rem 42rem at 26% 86%, transparent 0 16%, var(--dune-contour-a) 16.6% 17.2%, transparent 17.8% 29%, var(--dune-contour-b) 29.6% 30.2%, transparent 30.8% 43%, var(--dune-contour-c) 43.6% 44.2%, transparent 44.8% 58%, var(--dune-contour-a) 58.6% 59.2%, transparent 60%),
+    radial-gradient(ellipse 118rem 48rem at 76% 78%, transparent 0 20%, var(--dune-contour-c) 20.6% 21.2%, transparent 21.8% 36%, var(--dune-contour-a) 36.6% 37.2%, transparent 37.8% 53%, var(--dune-contour-b) 53.6% 54.2%, transparent 55%),
+    radial-gradient(ellipse 72rem 28rem at 50% 32%, var(--dune-wash-a) 0 30%, transparent 72%),
+    radial-gradient(ellipse 84rem 36rem at 18% 78%, var(--dune-wash-b) 0 34%, transparent 76%),
+    radial-gradient(ellipse 80rem 30rem at 88% 20%, var(--dune-wash-c) 0 28%, transparent 74%),
+    radial-gradient(ellipse 96rem 42rem at 54% 98%, var(--dune-wash-d) 0 34%, transparent 78%),
+    linear-gradient(18deg, transparent 0 8%, var(--dune-sweep-a) 26%, transparent 48%, var(--dune-sweep-b) 66%, transparent 90%),
+    linear-gradient(108deg, var(--dune-base-a) 0%, var(--dune-base-b) 42%, var(--dune-base-c) 100%),
+    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
+    var(--canvas-bg);
+  background-size: auto, auto, auto, auto, auto, auto, auto, auto, 56px 56px, 56px 56px, auto;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat, repeat;
+}
+
+:root[data-view="document"][data-background="circles"] #chartCanvas {
+  background:
+    radial-gradient(circle at 50% 48%, color-mix(in srgb, var(--surface-solid) 20%, transparent), transparent 28rem),
+    repeating-radial-gradient(circle at 50% 48%, color-mix(in srgb, var(--muted) 12%, transparent) 0 1px, transparent 1px 9px),
+    repeating-radial-gradient(circle at 50% 48%, transparent 0 34px, color-mix(in srgb, var(--ring-guide) 20%, transparent) 35px 36px, transparent 37px 70px),
+    radial-gradient(circle at 50% 48%, transparent 0 8rem, color-mix(in srgb, var(--canvas-bg) 32%, transparent) 30rem),
+    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
+    var(--canvas-bg);
+  background-size: auto, auto, auto, auto, 48px 48px, 48px 48px, auto;
 }
 
 .node.view-document {

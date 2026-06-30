@@ -92,6 +92,8 @@ def exercise_appearance_presets(page, *, check_overflow: bool = False) -> None:
         page.wait_for_selector("#themePresetDropdown .custom-select-list:not([hidden])", timeout=3000)
         if page.locator("#themePresetDropdown .custom-select-group").count() < 3:
             raise AssertionError("Theme variants were not grouped in custom dropdown")
+        if page.locator('#themePresetDropdown .custom-select-option[data-value="sand"]').count() != 1:
+            raise AssertionError("Sand theme did not appear in theme dropdown")
         page.locator('#themePresetDropdown .custom-select-option[data-value="oxide"]').click()
         page.wait_for_timeout(50)
         if page.locator("#themePresetInput").input_value() != "oxide":
@@ -103,11 +105,15 @@ def exercise_appearance_presets(page, *, check_overflow: bool = False) -> None:
         page.wait_for_selector("#stylePresetDropdown .custom-select-list:not([hidden])", timeout=3000)
         if page.locator("#stylePresetDropdown .custom-select-group").count() < 3:
             raise AssertionError("Style presets were not grouped in custom dropdown")
+        if page.locator('#stylePresetDropdown .custom-select-option[data-value="dust"]').count() != 1:
+            raise AssertionError("Dust style did not appear in style dropdown")
         page.keyboard.press("Escape")
         page.locator("#backgroundEffectDropdown .custom-select-button").click()
         page.wait_for_selector("#backgroundEffectDropdown .custom-select-list:not([hidden])", timeout=3000)
         if page.locator('#backgroundEffectDropdown .custom-select-option[data-value="waves"]').count() != 0:
-            raise AssertionError("Disabled Waves background still appeared in dropdown")
+            raise AssertionError("Scrapped Waves background still appeared in dropdown")
+        if page.locator('#backgroundEffectDropdown .custom-select-option[data-value="circles"]').count() != 1:
+            raise AssertionError("Circles background did not appear in dropdown")
         page.locator('#backgroundEffectDropdown .custom-select-option[data-value="spirits"]').click()
         page.wait_for_timeout(50)
         if page.evaluate("document.documentElement.dataset.background") != "spirits":
@@ -115,11 +121,46 @@ def exercise_appearance_presets(page, *, check_overflow: bool = False) -> None:
         if page.locator("#chartCanvas").evaluate("el => getComputedStyle(el).animationName") != "spiritsDrift":
             raise AssertionError("Spirits background animation did not apply")
         page.locator("#backgroundEffectInput").evaluate(
-            "(select) => { select.value = 'waves'; select.dispatchEvent(new Event('change', { bubbles: true })); }"
+            "(select) => { select.value = 'circles'; select.dispatchEvent(new Event('change', { bubbles: true })); }"
         )
         page.wait_for_timeout(50)
-        if page.evaluate("document.documentElement.dataset.background") != "none":
-            raise AssertionError("Legacy Waves background did not normalize to none")
+        if page.evaluate("document.documentElement.dataset.background") != "circles":
+            raise AssertionError("Circles background did not set dataset")
+        circle_background = page.locator("#chartCanvas").evaluate(
+            "el => ({ animationName: getComputedStyle(el).animationName, backgroundImage: getComputedStyle(el).backgroundImage })"
+        )
+        if circle_background["animationName"] != "none" or "repeating-radial-gradient" not in circle_background["backgroundImage"]:
+            raise AssertionError("Circles background did not render as static radial texture")
+        if page.evaluate("window.RingMapChart.storage.normalizeBackgroundEffect('waves')") != "circles":
+            raise AssertionError("Legacy Waves background did not normalize to Circles")
+        page.locator("#documentViewButton").click()
+        page.wait_for_timeout(50)
+        circle_book = page.locator("#chartCanvas").evaluate(
+            "el => ({ animationName: getComputedStyle(el).animationName, backgroundImage: getComputedStyle(el).backgroundImage })"
+        )
+        if circle_book["animationName"] != "none" or "repeating-radial-gradient" not in circle_book["backgroundImage"]:
+            raise AssertionError("Circles background did not render in Book view")
+        page.locator("#radialViewButton").click()
+        page.wait_for_timeout(50)
+        page.locator("#backgroundEffectDropdown .custom-select-button").click()
+        page.locator('#backgroundEffectDropdown .custom-select-option[data-value="dunes"]').click()
+        page.wait_for_timeout(50)
+        if page.evaluate("document.documentElement.dataset.background") != "dunes":
+            raise AssertionError("Dunes background did not set dataset")
+        dunes_background = page.locator("#chartCanvas").evaluate("el => getComputedStyle(el).backgroundImage")
+        if "repeating-radial-gradient" in dunes_background or "repeating-linear-gradient" in dunes_background:
+            raise AssertionError("Dunes background should not tile dust texture")
+        if dunes_background.count("radial-gradient") < 4:
+            raise AssertionError("Dunes background did not apply full-canvas dusty wash")
+        if page.locator(".canvas-wrap").evaluate("el => getComputedStyle(el, '::before').display") != "none":
+            raise AssertionError("Dunes background should not use overlay")
+        page.locator("#documentViewButton").click()
+        page.wait_for_timeout(50)
+        document_dunes_background = page.locator("#chartCanvas").evaluate("el => getComputedStyle(el).backgroundImage")
+        if not document_dunes_background.startswith("radial-gradient") or document_dunes_background.count("radial-gradient") < 4:
+            raise AssertionError("Dunes background was hidden by Book layout page background")
+        page.locator("#radialViewButton").click()
+        page.wait_for_timeout(50)
         page.locator("#backgroundEffectDropdown .custom-select-button").click()
         page.locator('#backgroundEffectDropdown .custom-select-option[data-value="image"]').click()
         page.wait_for_selector("#backgroundImageUpload:not([hidden])", timeout=3000)
@@ -422,6 +463,10 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
             raise AssertionError(f"Trackpad pan did not move both axes: {before_pan} -> {after_pan}")
 
         page.locator(".settings-menu > summary").click()
+        page.wait_for_selector(".settings-menu[open] .settings-panel", timeout=3000)
+        menu_style = page.locator(".settings-panel").evaluate("el => ({ maxHeight: getComputedStyle(el).maxHeight, overflowY: getComputedStyle(el).overflowY })")
+        if menu_style["overflowY"] != "auto" or menu_style["maxHeight"] == "none":
+            raise AssertionError(f"Settings panel did not have bounded scrolling: {menu_style}")
         page.locator("#radialViewButton").click()
         page.locator("[data-layout-preset='wide']").click()
         page.wait_for_timeout(150)
@@ -437,6 +482,18 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
             raise AssertionError("Range control did not sync number input")
         page.keyboard.press("Escape")
         page.locator(".settings-menu > summary").click()
+        page.locator(".mind-menu > summary").click()
+        page.locator(".trust-data > summary").click()
+        page.locator("#authorDisplayNameInput").fill("Smoke Tester")
+        page.locator("#saveAuthorProfileButton").click()
+        page.wait_for_timeout(150)
+        trust_text = page.locator("#trustDataSummary").text_content() or ""
+        for expected in ["Schema v2", "Smoke Tester", "No completed sync"]:
+            if expected not in trust_text:
+                raise AssertionError(f"Trust/Data summary missing {expected}: {trust_text}")
+        page.locator("#trustRecoveryButton").click()
+        page.wait_for_timeout(150)
+        page.locator(".mind-menu > summary").click()
         exercise_appearance_presets(page)
 
         page.locator(".mind-menu > summary").click()
@@ -445,6 +502,13 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
         download = download_info.value
         if not download.suggested_filename.endswith(".mind.json"):
             raise AssertionError(f"Unexpected export filename: {download.suggested_filename}")
+        exported = json.loads(Path(download.path()).read_text())
+        if exported.get("schemaVersion") != 2 or exported.get("version") != 2:
+            raise AssertionError("Mind export did not use schema v2")
+        if exported.get("authorProfile", {}).get("displayName") != "Smoke Tester":
+            raise AssertionError("Mind export did not include author profile")
+        if exported.get("sync", {}).get("provider", None) not in {"", "github"}:
+            raise AssertionError("Mind export included invalid sync metadata")
         page.locator("#recoveryButton").click()
         page.wait_for_selector("#recoveryDialog:not([hidden])", timeout=3000)
         if "nodes" not in (page.locator("#recoveryCurrentStats").text_content() or ""):
@@ -458,11 +522,14 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
         page.wait_for_timeout(150)
         if "Broken Smoke Root" not in (page.locator("#chartCanvas").text_content() or ""):
             raise AssertionError("Recovery setup rename did not render")
-        page.on("dialog", lambda dialog: dialog.accept())
         page.locator(".mind-menu > summary").click()
         page.locator("#recoveryButton").click()
         page.wait_for_selector("#recoveryDialog:not([hidden])", timeout=3000)
         page.locator("#recoveryList .recovery-item").first.locator("button", has_text="Restore").click()
+        page.wait_for_selector("#appDialog:not([hidden])", timeout=3000)
+        if "Restore recovery point" not in (page.locator("#appDialog").text_content() or ""):
+            raise AssertionError("Recovery restore did not open app dialog")
+        page.locator("#appDialogActions button", has_text="Restore").click()
         page.wait_for_timeout(350)
         if "Modern Smoke Root" not in (page.locator("#chartCanvas").text_content() or ""):
             raise AssertionError("Recovery restore did not restore original title")
@@ -481,6 +548,8 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
 
         page.locator(".mind-menu > summary").click()
         page.locator("#deleteMapButton").click()
+        page.wait_for_selector("#appDialog:not([hidden])", timeout=3000)
+        page.locator("#appDialogActions button", has_text="Delete").click()
         page.wait_for_timeout(250)
         final_maps = page.locator("#mapSelect option").count()
         if final_maps != before_maps:
