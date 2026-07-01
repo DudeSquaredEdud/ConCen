@@ -106,6 +106,54 @@
       })
     );
     defs.append(sketchFilter);
+    const dustFilter = utils.svgEl("filter", {
+      id: "dust-edge-grain",
+      x: "-18%",
+      y: "-18%",
+      width: "136%",
+      height: "136%"
+    });
+    dustFilter.append(
+      utils.svgEl("feTurbulence", {
+        type: "fractalNoise",
+        baseFrequency: "0.92",
+        numOctaves: "4",
+        seed: "31",
+        result: "grain"
+      }),
+      utils.svgEl("feColorMatrix", {
+        in: "grain",
+        type: "matrix",
+        values: "0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  .95 .95 .95 0 -.28",
+        result: "grainAlpha"
+      }),
+      utils.svgEl("feComposite", {
+        in: "SourceGraphic",
+        in2: "grainAlpha",
+        operator: "in",
+        result: "texturedStroke"
+      }),
+      utils.svgEl("feTurbulence", {
+        type: "fractalNoise",
+        baseFrequency: "0.09",
+        numOctaves: "2",
+        seed: "13",
+        result: "wobble"
+      }),
+      utils.svgEl("feDisplacementMap", {
+        in: "texturedStroke",
+        in2: "wobble",
+        scale: "1.7",
+        xChannelSelector: "R",
+        yChannelSelector: "G",
+        result: "roughStatic"
+      }),
+      utils.svgEl("feGaussianBlur", {
+        in: "roughStatic",
+        stdDeviation: "0.16"
+      })
+    );
+    defs.append(dustFilter);
     config.textures.forEach((markup, index) => {
       const pattern = utils.svgEl("pattern", {
         id: `texture-${index}`,
@@ -156,6 +204,11 @@
       d: `M ${from.x} ${from.y} L ${to.x} ${to.y}`,
       stroke: detailedEdges ? `url(#${gradientId})` : renderColor(tree, child)
     });
+    targetLayer.append(utils.svgEl("path", {
+      class: `dust-edge ${isPathEdge ? "path-edge" : ""}`,
+      d: `M ${from.x} ${from.y} L ${to.x} ${to.y}`,
+      stroke: detailedEdges ? `url(#${gradientId})` : renderColor(tree, child)
+    }));
     targetLayer.append(edge);
     if (detailedEdges) targetLayer.append(this.renderPencilEdge(parent.id + "-" + child.id, from, to, isPathEdge));
   };
@@ -213,6 +266,16 @@
       height: size.height,
       fill: node.depth === 0 ? "var(--root-node-fill)" : "var(--node-fill)",
       stroke: color
+    }));
+    group.append(utils.svgEl("rect", {
+      class: "node-accent",
+      x: 0,
+      y: 0,
+      width: Math.min(7, Math.max(4, size.width * 0.025)),
+      height: size.height,
+      fill: color,
+      "pointer-events": "none",
+      "aria-hidden": "true"
     }));
 
     if (node.markerEnabled === true && showPriorityMarkers) {

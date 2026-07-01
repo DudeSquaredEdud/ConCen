@@ -435,10 +435,6 @@ body {
     color-mix(in srgb, var(--surface-raised) 94%, transparent);
 }
 
-:root[data-style="dust"] .node-box {
-  stroke-dasharray: 1 3;
-}
-
 :root[data-style="blueprint"] .toolbar,
 :root[data-style="blueprint"] .toolbar-group,
 :root[data-style="blueprint"] .settings-panel,
@@ -2499,6 +2495,15 @@ select.native-select-hidden {
   opacity: 0.82;
 }
 
+:root[data-view="book"] .edge,
+:root[data-view="book"] .pencil-edge,
+:root[data-view="book"] .ring-guide,
+:root[data-view="document"] .edge,
+:root[data-view="document"] .pencil-edge,
+:root[data-view="document"] .ring-guide {
+  display: none;
+}
+
 :root[data-style="print"] .edge {
   stroke-width: 1.4;
   opacity: 0.7;
@@ -2522,10 +2527,43 @@ select.native-select-hidden {
   opacity: 0.72;
 }
 
+.dust-edge {
+  display: none;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+:root[data-style="dust"] .edge {
+  stroke-width: 1.8;
+  opacity: 0.5;
+  filter: url(#dust-edge-grain);
+}
+
 .edge.path-edge {
   stroke-width: 4.8;
   opacity: 0.9;
   filter: saturate(1.65) drop-shadow(0 1px 3px rgba(20, 24, 32, 0.18));
+}
+
+:root[data-style="dust"] .edge.path-edge {
+  stroke-width: 2.7;
+  opacity: 0.62;
+  filter: url(#dust-edge-grain);
+}
+
+:root[data-style="dust"] .dust-edge {
+  display: block;
+  stroke-width: 8.8;
+  opacity: 0.2;
+  filter: url(#dust-edge-grain);
+  mix-blend-mode: multiply;
+}
+
+:root[data-style="dust"] .dust-edge.path-edge {
+  stroke-width: 11;
+  opacity: 0.28;
 }
 
 :root[data-style="schematic"] .edge.path-edge {
@@ -2588,6 +2626,15 @@ select.native-select-hidden {
 
 :root[data-theme="dark"][data-style="papery"] .pencil-edge.path-edge {
   stroke: rgba(250, 229, 184, 0.64);
+}
+
+:root[data-theme="dark"][data-style="dust"] .dust-edge {
+  mix-blend-mode: screen;
+}
+
+:root[data-view="book"] .dust-edge,
+:root[data-view="document"] .dust-edge {
+  display: none;
 }
 
 .ring-guide {
@@ -2700,6 +2747,30 @@ select.native-select-hidden {
   transform-origin: center;
 }
 
+.node .node-accent {
+  display: none;
+  opacity: 0.86;
+  pointer-events: none;
+}
+
+:root[data-style="dust"] .node .node-box {
+  stroke-width: 2.8;
+  stroke-opacity: 0.62;
+  filter: url(#dust-edge-grain) drop-shadow(0 0 3px color-mix(in srgb, #d4ad72 38%, transparent));
+  mix-blend-mode: multiply;
+}
+
+:root[data-style="dust"] .node.depth-0 .node-box {
+  stroke-width: 3.4;
+  stroke-opacity: 0.68;
+}
+
+:root[data-theme="dark"][data-style="dust"] .node .node-box {
+  filter: url(#dust-edge-grain) drop-shadow(0 0 3px color-mix(in srgb, #b78a51 28%, transparent));
+  mix-blend-mode: screen;
+  stroke-opacity: 0.58;
+}
+
 .node.focus-pop .node-box,
 .node.focus-pop .node-label,
 .node.focus-pop .node-note-preview,
@@ -2725,14 +2796,23 @@ select.native-select-hidden {
 .node.sibling .node-box {
   fill: var(--node-fill);
   stroke-width: 2.2;
-  stroke-dasharray: 5 5;
   filter: saturate(1.45) drop-shadow(0 1px 3px rgba(20, 24, 32, 0.16));
+}
+
+:root:not([data-style="dust"]) .node.sibling .node-box {
+  stroke-dasharray: 5 5;
 }
 
 .node.path-node:not(.depth-0) .node-box {
   fill: var(--node-fill);
   stroke-width: 2.2;
   filter: saturate(1.45) drop-shadow(0 1px 3px rgba(20, 24, 32, 0.16));
+}
+
+:root[data-style="dust"] .node.sibling .node-box,
+:root[data-style="dust"] .node.path-node:not(.depth-0) .node-box {
+  stroke-width: 3.4;
+  stroke-opacity: 0.74;
 }
 
 .node .map-marker {
@@ -2872,6 +2952,11 @@ select.native-select-hidden {
   font-weight: 850;
 }
 
+.node.view-book .node-accent,
+.node.view-document .node-accent {
+  display: block;
+}
+
 .node.view-book.role-cover .node-box {
   stroke-width: 2.2;
 }
@@ -2885,14 +2970,12 @@ select.native-select-hidden {
   fill: color-mix(in srgb, var(--node-fill) 92%, var(--canvas-bg));
 }
 
-.node.view-book.role-note .node-box {
-  stroke-dasharray: 4 3;
+.node.view-book:not(.depth-0) .node-box {
+  stroke: color-mix(in srgb, var(--hairline) 76%, transparent);
 }
 
-:root[data-view="document"] .edge,
-:root[data-view="document"] .pencil-edge,
-:root[data-view="document"] .ring-guide {
-  display: none;
+.node.view-book.role-note .node-box {
+  stroke-dasharray: none;
 }
 
 :root[data-view="document"] #chartCanvas {
@@ -2947,6 +3030,26 @@ select.native-select-hidden {
   stroke-width: 1;
   rx: 0;
   ry: 0;
+}
+
+:root[data-note-sidebar="open"][data-view="book"] .nodes,
+:root[data-note-sidebar="open"][data-view="document"] .nodes {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: translateX(-280px);
+  transition: transform 140ms cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+:root[data-view="book"] .nodes,
+:root[data-view="document"] .nodes {
+  transition: transform 140ms cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+@media (max-width: 760px) {
+  :root[data-note-sidebar="open"][data-view="book"] .nodes,
+  :root[data-note-sidebar="open"][data-view="document"] .nodes {
+    transform: translateX(-150px);
+  }
 }
 
 .node.view-document.role-doc-title .node-box {

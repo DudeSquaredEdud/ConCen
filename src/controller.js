@@ -1723,6 +1723,7 @@
     clearTimeout(this.noteCloseTimer);
     this.el.noteSidebar.classList.remove("is-closing");
     this.el.noteSidebar.hidden = false;
+    document.documentElement.dataset.noteSidebar = "open";
     this.syncNoteSidebar();
     requestAnimationFrame(() => this.el.noteInput.focus());
   };
@@ -1745,6 +1746,7 @@
     this.noteCloseTimer = setTimeout(() => {
       this.el.noteSidebar.hidden = true;
       this.el.noteSidebar.classList.remove("is-closing");
+      if (this.el.noteSidebar && this.el.noteSidebar.hidden) delete document.documentElement.dataset.noteSidebar;
     }, reducedMotion ? 1 : 130);
     if (focusCanvas !== false) this.el.svg.focus();
   };
@@ -1754,6 +1756,7 @@
     const node = this.currentMindNode();
     if (!node) {
       this.el.noteSidebar.hidden = true;
+      delete document.documentElement.dataset.noteSidebar;
       return;
     }
     this.el.noteSidebarTitle.textContent = node.label;

@@ -107,6 +107,26 @@ def exercise_appearance_presets(page, *, check_overflow: bool = False) -> None:
             raise AssertionError("Style presets were not grouped in custom dropdown")
         if page.locator('#stylePresetDropdown .custom-select-option[data-value="dust"]').count() != 1:
             raise AssertionError("Dust style did not appear in style dropdown")
+        page.locator("#stylePresetInput").evaluate(
+            "(select) => { select.value = 'dust'; select.dispatchEvent(new Event('change', { bubbles: true })); }"
+        )
+        dust_edge = page.locator("#chartCanvas").evaluate(
+            """svg => {
+                const ns = 'http://www.w3.org/2000/svg';
+                const stroke = document.createElementNS(ns, 'path');
+                stroke.setAttribute('class', 'dust-edge');
+                svg.append(stroke);
+                const result = {
+                    display: getComputedStyle(stroke).display,
+                    filter: getComputedStyle(stroke).filter,
+                    width: getComputedStyle(stroke).strokeWidth
+                };
+                stroke.remove();
+                return result;
+            }"""
+        )
+        if dust_edge["display"] != "block" or "dust-edge-grain" not in dust_edge["filter"] or not dust_edge["width"].endswith("px"):
+            raise AssertionError(f"Dust SVG edge styling did not apply: {dust_edge}")
         page.keyboard.press("Escape")
         page.locator("#backgroundEffectDropdown .custom-select-button").click()
         page.wait_for_selector("#backgroundEffectDropdown .custom-select-list:not([hidden])", timeout=3000)
