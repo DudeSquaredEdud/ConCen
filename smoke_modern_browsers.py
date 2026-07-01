@@ -264,11 +264,6 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
         if "Ctrl K" not in (page.locator("#shortcutSheet").text_content() or ""):
             raise AssertionError("Shortcut sheet did not render command shortcut")
         page.locator("#shortcutSheetCloseButton").click()
-        page.keyboard.down("Control")
-        page.wait_for_timeout(2100)
-        page.keyboard.up("Control")
-        page.wait_for_selector("#shortcutSheet:not([hidden])", timeout=3000)
-        page.locator("#shortcutSheetCloseButton").click()
 
         initial_nodes = page.locator("#chartCanvas .node").count()
         if initial_nodes != 1:

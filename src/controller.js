@@ -148,8 +148,6 @@
     this.githubSync = loadGithubSyncConfig();
     this.activeCustomSelect = null;
     this.layoutSettingsOpen = false;
-    this.ctrlHoldTimer = null;
-    this.ctrlOnlyDown = false;
   }
 
   Controller.prototype.start = function () {
@@ -545,7 +543,6 @@
   };
 
   Controller.prototype.handleDocumentPointerDown = function (event) {
-    this.cancelShortcutHold();
     if (this.activeCustomSelect && !this.activeCustomSelect.root.contains(event.target)) this.closeCustomSelect();
     if (this.layoutSettingsOpen && this.el.layoutSettingsDropdown && !this.el.layoutSettingsDropdown.contains(event.target)) this.closeLayoutSettings();
     if (!this.actionBarOpen) return;
@@ -574,7 +571,6 @@
 
   Controller.prototype.handleGlobalKeyDown = function (event) {
     if (event.defaultPrevented) return;
-    this.trackShortcutHold(event);
     const editableTarget = utils.isEditableTarget(document.activeElement);
     if (event.key === "Escape" && this.el.recoveryDialog && !this.el.recoveryDialog.hidden) {
       event.preventDefault();
@@ -647,7 +643,6 @@
   };
 
   Controller.prototype.handleGlobalKeyUp = function (event) {
-    if (event.key === "Control") this.cancelShortcutHold();
     if (event.code !== "Space") return;
     this.isSpaceDown = false;
     this.el.svg.classList.remove("space-pan-ready");
@@ -656,32 +651,8 @@
 
   Controller.prototype.clearPanKeys = function () {
     this.isSpaceDown = false;
-    this.cancelShortcutHold();
     this.el.svg.classList.remove("space-pan-ready");
     this.endPan();
-  };
-
-  Controller.prototype.trackShortcutHold = function (event) {
-    if (event.key === "Control" && !event.repeat && !event.altKey && !event.metaKey && !event.shiftKey) {
-      if (utils.isEditableTarget(document.activeElement)) return;
-      if (this.isModalOpen()) return;
-      this.cancelShortcutHold();
-      this.ctrlOnlyDown = true;
-      this.ctrlHoldTimer = setTimeout(() => {
-        if (!this.ctrlOnlyDown) return;
-        this.openShortcutSheet();
-      }, 2000);
-      return;
-    }
-    if (event.key !== "Control") this.cancelShortcutHold();
-  };
-
-  Controller.prototype.cancelShortcutHold = function () {
-    this.ctrlOnlyDown = false;
-    if (this.ctrlHoldTimer) {
-      clearTimeout(this.ctrlHoldTimer);
-      this.ctrlHoldTimer = null;
-    }
   };
 
   Controller.prototype.isModalOpen = function () {
@@ -2146,7 +2117,6 @@
   };
 
   Controller.prototype.openShortcutSheet = function () {
-    this.cancelShortcutHold();
     if (!this.el.shortcutSheet) return;
     if (this.el.commandPalette) this.el.commandPalette.hidden = true;
     this.el.shortcutSheet.hidden = false;
@@ -2156,7 +2126,6 @@
   };
 
   Controller.prototype.closeShortcutSheet = function () {
-    this.cancelShortcutHold();
     if (!this.el.shortcutSheet) return;
     this.el.shortcutSheet.hidden = true;
     this.el.svg.focus();
@@ -2497,7 +2466,7 @@
     const commands = [
       { kind: "command", title: "Add child", detail: "Enter", run: () => this.addNode(true) },
       { kind: "command", title: "Show welcome", detail: "Templates, recents, shortcuts", run: () => this.openWelcome() },
-      { kind: "command", title: "Show shortcuts", detail: "Hold Ctrl", run: () => this.openShortcutSheet() },
+      { kind: "command", title: "Show shortcuts", detail: "Toolbar ?", run: () => this.openShortcutSheet() },
       { kind: "command", title: "Find node", detail: "Type any node, note, tag, status, or priority", run: () => this.updateStatus("Type to search nodes and notes") },
       { kind: "command", title: "Move focus", detail: "Arrows, WASD, HJKL", run: () => this.updateStatus("Move focus: arrows, WASD, or HJKL") },
       { kind: "command", title: "Tree movement", detail: "Shift+Arrow", run: () => this.updateStatus("Tree movement: Shift+Arrow") },
