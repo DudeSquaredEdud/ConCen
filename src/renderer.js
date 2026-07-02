@@ -51,7 +51,14 @@
     });
     this.svg.addEventListener("dblclick", (event) => {
       const item = eventNode(event, this.svg);
-      if (!item || !this.handlers || !this.handlers.edit) return;
+      if (!item || !this.handlers) return;
+      const group = (event.target.closest && event.target.closest(".node")) || item.group;
+      const noteTarget = event.target.closest && event.target.closest(".note-marker, .node-note-preview");
+      if (noteTarget && this.handlers.openNote) {
+        this.handlers.openNote(item.id);
+        return;
+      }
+      if (!this.handlers.edit) return;
       this.handlers.edit(item.id);
     });
   };
@@ -325,11 +332,11 @@
       group.append(marker);
     }
 
-    this.renderNodeText(group, node, size, viewMode, handlers);
+    this.renderNodeText(group, node, size, viewMode, handlers, showPriorityMarkers);
     layer.append(group);
   };
 
-  Renderer.prototype.renderNodeText = function (group, node, size, viewMode, handlers) {
+  Renderer.prototype.renderNodeText = function (group, node, size, viewMode, handlers, showPriorityMarkers) {
     const profile = textProfile(viewMode, node.depth);
     if (!profile) {
       const label = utils.svgEl("text", { class: "node-label", x: size.width / 2, y: size.height / 2 });
@@ -343,7 +350,8 @@
     const contentHeight = labelLines.length * profile.labelLineHeight +
       (noteLines.length ? profile.noteGap + noteLines.length * profile.noteLineHeight : 0);
     let y = Math.max(profile.padY, (size.height - contentHeight) / 2);
-    const x = profile.padX;
+    const markerIndent = node.markerEnabled === true && showPriorityMarkers ? Math.min(34, Math.max(26, size.width * 0.08)) : 0;
+    const x = profile.padX + markerIndent;
     const label = utils.svgEl("text", {
       class: "node-label",
       x,
@@ -358,12 +366,12 @@
     y += labelLines.length * profile.labelLineHeight + profile.noteGap;
     const note = utils.svgEl("text", {
       class: "node-note-preview",
-      x: profile.padX,
+      x,
       y: y + profile.noteLineHeight / 2,
       "text-anchor": "start",
       "dominant-baseline": "middle"
     });
-    appendMarkdownTspans(note, noteLines, profile.padX, profile.noteLineHeight, handlers);
+    appendMarkdownTspans(note, noteLines, x, profile.noteLineHeight, handlers);
     group.append(note);
   };
 
@@ -374,27 +382,58 @@
       waiting: "#f59e0b",
       done: "#3b82f6"
     }[node.status || "open"] || "#ef4444";
-    const priorityText = {
-      low: "—",
-      normal: "●",
-      high: "!",
-      critical: "!!!"
-    }[node.priority || "normal"] || "•";
+    const priority = node.priority || "normal";
+    const markerRadius = Math.min(34, Math.max(24, Math.min(size.width, size.height) * 0.42));
     const marker = utils.svgEl("g", {
-      class: `meta-marker status-${node.status || "open"} priority-${node.priority || "normal"}`,
-      transform: "translate(15, 12)"
+      class: `meta-marker status-${node.status || "open"} priority-${priority}`,
+      transform: "translate(0, 0)"
     });
     if (showPriorityMarkers) {
-      const text = utils.svgEl("text", {
-        class: "priority-marker",
-        x: 0,
-        y: 0
+      marker.append(utils.svgEl("path", {
+        class: "priority-corner-base",
+        d: `M0 0H${markerRadius}A${markerRadius} ${markerRadius} 0 0 1 0 ${markerRadius}Z`
+      }));
+      const clipPath = utils.svgEl("clipPath", {
+        id: `priority-clip-${node.id}`
       });
-      if (showStatusMarkers) text.setAttribute("style", `fill: ${statusColor}`);
-      text.textContent = priorityText;
-      marker.append(text);
+      clipPath.append(utils.svgEl("path", {
+        d: `M0 0H${markerRadius}A${markerRadius} ${markerRadius} 0 0 1 0 ${markerRadius}Z`
+      }));
+      marker.append(clipPath);
+      marker.append(utils.svgEl("g", {
+        class: "priority-fill-layer",
+        "clip-path": `url(#priority-clip-${node.id})`
+      }));
+      this.renderPriorityFill(marker.lastChild, priority, markerRadius, statusColor, showStatusMarkers);
     }
     group.append(marker);
+  };
+
+  Renderer.prototype.renderPriorityFill = function (marker, priority, radius, statusColor, showStatusMarkers) {
+    const fillColor = showStatusMarkers ? statusColor : "var(--muted)";
+    const amount = {
+      low: 0.28,
+      normal: 0.52,
+      high: 0.76,
+      critical: 1
+    }[priority] || 0.38;
+    const fillRadius = radius * amount;
+    const d = [
+      "M0 0",
+      `H${fillRadius.toFixed(2)}`,
+      `A${fillRadius.toFixed(2)} ${fillRadius.toFixed(2)} 0 0 1 0 ${fillRadius.toFixed(2)}`,
+      "Z"
+    ].join(" ");
+    marker.append(utils.svgEl("path", {
+      class: `priority-fill priority-fill-${priority}`,
+      d,
+      fill: fillColor
+    }));
+    marker.append(utils.svgEl("path", {
+      class: "priority-fill-rim",
+      d: `M${fillRadius.toFixed(2)} 0A${fillRadius.toFixed(2)} ${fillRadius.toFixed(2)} 0 0 1 0 ${fillRadius.toFixed(2)}`,
+      stroke: fillColor
+    }));
   };
 
   Renderer.prototype.editorRect = function (node, point, activeViewBox) {
@@ -415,8 +454,28 @@
   function eventNode(event, svg) {
     const target = event.target;
     const group = target && target.closest ? target.closest(".node") : null;
-    if (!group || !svg.contains(group)) return null;
-    const id = group.getAttribute("data-node-id");
+    if (group && svg.contains(group)) return nodeItem(group);
+    return eventNodeAtPoint(event, svg);
+  }
+
+  function eventNodeAtPoint(event, svg) {
+    if (!event || !svg) return null;
+    const nodes = Array.from(svg.querySelectorAll(".node"));
+    for (let index = nodes.length - 1; index >= 0; index -= 1) {
+      const group = nodes[index];
+      const rect = group.getBoundingClientRect();
+      if (
+        event.clientX >= rect.left &&
+        event.clientX <= rect.right &&
+        event.clientY >= rect.top &&
+        event.clientY <= rect.bottom
+      ) return nodeItem(group);
+    }
+    return null;
+  }
+
+  function nodeItem(group) {
+    const id = group && group.getAttribute("data-node-id");
     return id ? { id, group } : null;
   }
 

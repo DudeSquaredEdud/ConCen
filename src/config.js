@@ -84,6 +84,10 @@
         controls: {
           treeLevelGap: "Paragraph spacing"
         }
+      },
+      notes: {
+        label: "Notes",
+        controls: {}
       }
     },
     appearanceDefaults: {
@@ -91,6 +95,7 @@
       stylePreset: "glass",
       backgroundEffect: "none",
       navigationMode: "outline",
+      screensaverEnabled: false,
       showStatusMarkers: false,
       showPriorityMarkers: true
     },
@@ -306,6 +311,28 @@
           "ring-guide": "rgba(132, 104, 62, 0.32)"
         }
       },
+      sandstorm: {
+        label: "Sandstorm",
+        group: "paper",
+        colorScheme: "dark",
+        tokens: {
+          bg: "#1a100a",
+          "surface-solid": "#2d1b10",
+          ink: "#ffd8a3",
+          muted: "#d79a63",
+          label: "#e0a66b",
+          field: "rgba(57, 32, 18, 0.86)",
+          "canvas-bg": "#150c07",
+          "canvas-grid": "rgba(255, 139, 54, 0.08)",
+          "canvas-wash": "rgba(231, 98, 27, 0.2)",
+          "node-fill": "rgba(52, 28, 16, 0.92)",
+          "node-ink": "#ffd9aa",
+          "root-node-fill": "#e8792e",
+          "root-node-ink": "#1b0c05",
+          "ring-guide": "rgba(232, 121, 46, 0.34)",
+          focus: "#ff9a3d"
+        }
+      },
       oxide: {
         label: "Oxide",
         group: "heat",
@@ -366,7 +393,7 @@
     },
     themeGroups: {
       neutral: { label: "Neutral", variants: ["light", "dark", "graphite", "contrast", "mono-high"] },
-      paper: { label: "Paper", variants: ["paper", "sage", "solar", "sand"] },
+      paper: { label: "Paper", variants: ["paper", "sage", "solar", "sand", "sandstorm"] },
       heat: { label: "Heat", variants: ["ember", "oxide"] },
       custom: { label: "Custom", variants: ["custom"] }
     },

@@ -80,6 +80,7 @@
     appearance.backgroundEffect = normalizeBackgroundEffect(input && input.backgroundEffect);
     appearance.backgroundImageData = normalizeBackgroundImageData(input && input.backgroundImageData);
     appearance.navigationMode = normalizeNavigationMode(input && input.navigationMode);
+    appearance.screensaverEnabled = input && typeof input.screensaverEnabled === "boolean" ? input.screensaverEnabled : fallback.screensaverEnabled === true;
     appearance.showStatusMarkers = input && typeof input.showStatusMarkers === "boolean" ? input.showStatusMarkers : fallback.showStatusMarkers !== false;
     appearance.showPriorityMarkers = input && typeof input.showPriorityMarkers === "boolean" ? input.showPriorityMarkers : fallback.showPriorityMarkers !== false;
     return appearance;
@@ -263,7 +264,7 @@
 
   function normalizeViewMode(value, fallback) {
     const mode = String(value || fallback || "radial");
-    return ["tree", "radial", "book", "document"].includes(mode) ? mode : "radial";
+    return ["tree", "radial", "book", "document", "notes"].includes(mode) ? mode : "radial";
   }
 
   function normalizeBranchColors(input) {

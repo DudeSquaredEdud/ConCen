@@ -778,7 +778,14 @@ summary:focus-visible,
 }
 
 .view-mode-control {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  gap: 1px;
+}
+
+.view-mode-control.segmented-control button {
+  min-width: 48px;
+  padding: 0 7px;
+  font-size: 11px;
 }
 
 .segmented-control button,
@@ -901,6 +908,42 @@ button,
   font-size: 17px;
   font-weight: 740;
   line-height: 1;
+}
+
+.has-ui-icon::before {
+  content: none !important;
+  display: none !important;
+}
+
+.ui-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  color: currentColor;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.icon-button .ui-icon {
+  margin: 0;
+}
+
+button.has-ui-icon:not(.icon-button) .ui-icon,
+summary.has-ui-icon:not(.icon-button) .ui-icon,
+label.has-ui-icon .ui-icon {
+  width: 16px;
+  height: 16px;
+  flex-basis: 16px;
+  margin-right: 8px;
+  color: var(--muted);
+}
+
+.quiet-danger.has-ui-icon .ui-icon {
+  color: currentColor;
 }
 
 .map-controls .icon-button {
@@ -1402,6 +1445,39 @@ select.native-select-hidden {
   cursor: pointer;
 }
 
+
+
+.screensaver-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--label);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.screensaver-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--focus);
+}
+
+.screensaver-start-button:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+.screensaver-start-button {
+  justify-content: center;
+  min-height: 34px;
+}
+
 .theme-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1481,6 +1557,10 @@ select.native-select-hidden {
   display: grid;
   gap: 9px;
   width: min(360px, 78vw);
+  max-height: min(520px, calc(100vh - 150px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   padding: 10px;
   border: 1px solid var(--glass-border);
   border-radius: 12px;
@@ -1569,6 +1649,15 @@ select.native-select-hidden {
   pointer-events: none;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.status-pill.is-toast {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--focus) 50%, var(--glass-border));
+  background: color-mix(in srgb, var(--surface-raised) 94%, var(--focus-soft));
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-1px);
 }
 
 .canvas-wrap {
@@ -1939,6 +2028,7 @@ select.native-select-hidden {
 
 .app-dialog {
   align-items: center;
+  z-index: 22;
   padding: 24px;
 }
 
@@ -2226,7 +2316,24 @@ select.native-select-hidden {
 }
 
 .welcome-templates button {
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  min-width: 148px;
+  padding: 9px 11px;
+  text-align: left;
   background: color-mix(in srgb, var(--focus) 10%, var(--control));
+}
+
+.welcome-templates button strong {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.welcome-templates button small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
 }
 
 .welcome-recent span {
@@ -2311,6 +2418,297 @@ select.native-select-hidden {
   outline: none;
   cursor: default;
   touch-action: none;
+}
+
+:root[data-screensaver="active"] .app-shell {
+  grid-template-rows: 1fr;
+}
+
+:root[data-screensaver="active"] .toolbar {
+  display: none;
+}
+
+:root[data-screensaver="active"] .toolbar,
+:root[data-screensaver="active"] .path-trail,
+:root[data-screensaver="active"] .node-action-bar,
+:root[data-screensaver="active"] .note-sidebar,
+:root[data-screensaver="active"] .status-pill,
+:root[data-screensaver="active"] .node-editor,
+:root[data-screensaver="active"] .command-palette,
+:root[data-screensaver="active"] .shortcut-sheet,
+:root[data-screensaver="active"] .welcome-dialog,
+:root[data-screensaver="active"] .recovery-dialog,
+:root[data-screensaver="active"] .app-dialog,
+:root[data-screensaver="active"] .tutorial-overlay {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+
+
+.notes-document {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: stretch center;
+  padding: 28px clamp(18px, 7vw, 120px);
+  background: color-mix(in srgb, var(--canvas-bg) 30%, transparent);
+  overflow: hidden;
+}
+
+.notes-document[hidden] {
+  display: none;
+}
+
+.notes-document-input {
+  display: none;
+}
+
+.notes-rich-editor {
+  width: min(940px, 100%);
+  height: 100%;
+  overflow: auto;
+  padding: clamp(28px, 5vw, 64px);
+  border: 1px solid color-mix(in srgb, var(--hairline) 68%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-solid) 68%, transparent);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  color: var(--ink);
+  box-shadow: var(--shadow-lg);
+  font: 500 17px/1.68 -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", sans-serif;
+  letter-spacing: 0;
+  caret-color: var(--focus);
+}
+
+.notes-rich-editor:focus {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 4px var(--focus-soft), var(--shadow-lg);
+}
+
+.notes-rich-editor:empty::before {
+  content: "Start writing...";
+  color: var(--muted);
+}
+
+.notes-rich-editor h1,
+.notes-rich-editor h2,
+.notes-rich-editor h3,
+.notes-rich-editor h4,
+.notes-rich-editor p,
+.notes-rich-editor ul,
+.notes-rich-editor ol {
+  margin: 0;
+}
+
+
+.notes-rich-editor h1,
+.notes-rich-editor h2,
+.notes-rich-editor h3,
+.notes-rich-editor h4 {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-left: 14px;
+}
+
+.notes-rich-editor h1::before,
+.notes-rich-editor h2::before,
+.notes-rich-editor h3::before,
+.notes-rich-editor h4::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.16em;
+  bottom: 0.16em;
+  width: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--focus) 72%, var(--muted));
+  opacity: 0.72;
+}
+
+.notes-rich-editor p,
+.notes-rich-editor ul,
+.notes-rich-editor ol {
+  margin-left: 0;
+  padding-left: 14px;
+  border-left: 1px solid color-mix(in srgb, var(--focus) 22%, transparent);
+}
+
+.notes-heading-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  white-space: nowrap;
+  user-select: none;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 760;
+  color: var(--muted);
+}
+
+.notes-heading-meta select {
+  min-height: 18px;
+  max-width: 84px;
+  padding: 0 18px 0 7px;
+  border: 1px solid color-mix(in srgb, var(--hairline) 82%, transparent);
+  border-radius: 999px;
+  appearance: none;
+  background:
+    linear-gradient(45deg, transparent 50%, currentColor 50%) right 8px center / 5px 5px no-repeat,
+    color-mix(in srgb, var(--field) 84%, transparent);
+  color: var(--muted);
+  font: inherit;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.notes-heading-meta select:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.notes-heading-status.status-active,
+.notes-heading-priority.priority-high,
+.notes-heading-priority.priority-critical {
+  color: var(--focus);
+  border-color: color-mix(in srgb, var(--focus) 42%, var(--hairline));
+  background:
+    linear-gradient(45deg, transparent 50%, currentColor 50%) right 8px center / 5px 5px no-repeat,
+    color-mix(in srgb, var(--focus-soft) 58%, var(--field));
+}
+
+.notes-rich-editor h1 {
+  font-size: 34px;
+  line-height: 1.12;
+  font-weight: 880;
+}
+
+.notes-rich-editor h2 {
+  margin-top: 18px;
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 820;
+}
+
+.notes-rich-editor h3 {
+  margin-top: 14px;
+  font-size: 19px;
+  line-height: 1.28;
+  font-weight: 780;
+}
+
+.notes-rich-editor h4 {
+  margin-top: 10px;
+  font-size: 16px;
+  line-height: 1.34;
+  font-weight: 740;
+  color: var(--muted);
+}
+
+.notes-rich-editor p {
+  min-height: 1.68em;
+}
+
+.notes-rich-editor ul,
+.notes-rich-editor ol {
+  padding-left: 24px;
+}
+
+.notes-rich-editor code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--field) 82%, var(--canvas-bg));
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.92em;
+}
+
+.notes-rich-editor mark {
+  border-radius: 4px;
+  padding: 0 3px;
+  background: var(--focus-soft);
+  color: var(--ink);
+}
+
+.notes-rich-editor a,
+.notes-md-wikilink {
+  color: var(--focus);
+  text-decoration: underline;
+  text-decoration-thickness: 1.2px;
+  text-underline-offset: 3px;
+}
+
+.notes-md-wikilink {
+  cursor: pointer;
+}
+
+#chartCanvas.notes-view-hidden {
+  opacity: 1;
+  pointer-events: none;
+}
+
+#chartCanvas.notes-view-hidden .ring-guides,
+#chartCanvas.notes-view-hidden .edges,
+#chartCanvas.notes-view-hidden .path-edges,
+#chartCanvas.notes-view-hidden .nodes {
+  opacity: 0;
+  pointer-events: none;
+}
+
+:root[data-view="notes"] .path-trail,
+:root[data-view="notes"] .node-action-bar,
+:root[data-view="notes"] .note-sidebar,
+:root[data-view="notes"] .node-editor {
+  display: none;
+}
+
+:root[data-screensaver="active"] .notes-document {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.screensaver-logo {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.96);
+  transition: opacity 240ms ease, transform 240ms ease;
+}
+
+.screensaver-logo .concen-logo {
+  width: clamp(110px, 18vmin, 210px);
+  height: clamp(110px, 18vmin, 210px);
+  border-radius: clamp(28px, 4vmin, 48px);
+  border-color: color-mix(in srgb, var(--glass-border) 70%, transparent);
+  background: color-mix(in srgb, var(--field) 72%, var(--focus) 28%);
+  color: color-mix(in srgb, var(--control-ink) 88%, var(--focus));
+  box-shadow: 0 22px 70px rgba(12, 18, 30, 0.18), var(--shadow-lg);
+}
+
+:root[data-screensaver="active"] .screensaver-logo {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1);
+}
+
+:root[data-screensaver="active"] #chartCanvas {
+  cursor: none;
+}
+
+:root[data-screensaver="active"] #chartCanvas > * {
+  opacity: 0;
+  pointer-events: none;
 }
 
 :root[data-style="print"] #chartCanvas {
@@ -2831,25 +3229,30 @@ select.native-select-hidden {
   pointer-events: none;
 }
 
-.node .priority-marker {
-  fill: var(--node-ink);
-  font-size: 14px;
-  font-weight: 900;
-  text-anchor: middle;
-  dominant-baseline: middle;
-  letter-spacing: 0;
-  paint-order: stroke;
-  stroke: var(--node-fill);
-  stroke-width: 2px;
+.node .priority-corner-base {
+  fill: #020617;
+  opacity: 0.2;
+  stroke: color-mix(in srgb, var(--node-fill) 56%, black);
+  stroke-width: 1.2;
 }
 
-.meta-marker.priority-normal .priority-marker {
-  font-size: 15px;
+.node .priority-fill {
+  opacity: 0.82;
 }
 
-.node.depth-0 .priority-marker {
-  fill: var(--root-node-ink);
-  stroke: var(--root-node-fill);
+.node .priority-fill-rim {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.86;
+}
+
+.meta-marker.priority-normal .priority-corner-base {
+  opacity: 0.34;
+}
+
+.node.depth-0 .priority-corner-base {
+  stroke: color-mix(in srgb, var(--root-node-fill) 56%, black);
 }
 
 :root[data-style="schematic"] .node .map-marker {
@@ -3444,5 +3847,12 @@ select.native-select-hidden {
 
   .recovery-item > div:last-child button {
     flex: 1;
+  }
+}
+
+@media (max-width: 900px) {
+  .notes-document {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(220px, 1fr) minmax(220px, 1fr);
   }
 }

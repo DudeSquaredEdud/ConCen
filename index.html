@@ -66,7 +66,7 @@
               <span class="visually-hidden">Zoom In</span>
             </button>
           </div>
-          <button id="commandPaletteButton" class="icon-button" data-icon="⌘" type="button" title="Search and commands (Ctrl+K)" aria-label="Search and commands">
+          <button id="commandPaletteButton" class="icon-button" data-icon="⌕" type="button" title="Search and commands (Ctrl+K)" aria-label="Search and commands">
             <span class="visually-hidden">Search and Commands</span>
           </button>
           <button id="shortcutSheetButton" class="icon-button" data-icon="?" type="button" title="Shortcuts" aria-label="Shortcuts">
@@ -191,6 +191,11 @@
                     <input id="importThemeInput" type="file" accept="application/json,.json">
                   </label>
                 </div>
+                <label class="screensaver-toggle">
+                  <span>Screensaver</span>
+                  <input id="screensaverEnabledInput" type="checkbox">
+                </label>
+                <button id="startScreensaverButton" class="screensaver-start-button" type="button" data-icon="◎">Start Screensaver</button>
               </div>
               <div class="spacing-controls" aria-label="Spacing controls">
                 <div class="spacing-header">
@@ -200,6 +205,7 @@
                     <button id="radialViewButton" type="button" aria-pressed="false">Radial</button>
                     <button id="bookViewButton" type="button" aria-pressed="false">Tree</button>
                     <button id="documentViewButton" type="button" aria-pressed="false">Book</button>
+                    <button id="notesViewButton" type="button" aria-pressed="false">Notes</button>
                   </div>
                   <div class="layout-preset-row" role="group" aria-label="Layout presets">
                     <button type="button" data-layout-preset="compact">Compact</button>
@@ -252,6 +258,29 @@
       <section class="canvas-wrap" aria-label="ConCen editor">
         <div id="pathTrail" class="path-trail" aria-label="Map path"></div>
         <svg id="chartCanvas" role="application" aria-label="ConCen mind map" tabindex="0"></svg>
+        <div id="notesDocument" class="notes-document" hidden>
+          <textarea id="notesDocumentInput" class="notes-document-input" aria-hidden="true" tabindex="-1"></textarea>
+          <article id="notesRichEditor" class="notes-rich-editor" contenteditable="true" spellcheck="true" aria-label="Editable notes document"></article>
+        </div>
+        <div id="screensaverLogo" class="screensaver-logo" aria-hidden="true">
+          <svg class="concen-logo" viewBox="0 0 1024 1024" focusable="false">
+            <rect class="concen-logo-bg" x="64" y="64" width="896" height="896" rx="210"/>
+            <g class="concen-logo-lines" fill="none" stroke-width="42" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M780.8 414.2 A286 286 0 0 1 655 759.7"/>
+              <path d="M462.3 793.7 A286 286 0 0 1 226 512"/>
+              <path d="M292.9 328.1 A286 286 0 0 1 655 264.3"/>
+              <path d="M512 512 L731 328"/>
+              <path d="M512 512 L562 794"/>
+              <path d="M512 512 L243 414"/>
+            </g>
+            <g class="concen-logo-nodes">
+              <circle cx="512" cy="512" r="76"/>
+              <circle cx="731" cy="328" r="68"/>
+              <circle cx="562" cy="794" r="68"/>
+              <circle cx="243" cy="414" r="68"/>
+            </g>
+          </svg>
+        </div>
         <div id="nodeActionBar" class="node-action-bar" aria-label="Focused node actions" hidden>
           <label class="node-field">
             <span>Focus</span>
@@ -340,7 +369,10 @@
           </div>
           <div class="shortcut-grid">
             <span>Search commands</span><kbd>Ctrl K</kbd>
+            <span>Move focus</span><kbd>Arrows / WASD / HJKL</kbd>
             <span>Open notes</span><kbd>Ctrl Enter</kbd>
+            <span>Open notes from node</span><kbd>Ctrl click</kbd>
+            <span>Open note marker</span><kbd>Double click</kbd>
             <span>Create parent</span><kbd>Ctrl Shift Enter</kbd>
             <span>Parent map</span><kbd>Ctrl ←</kbd>
             <span>Child map</span><kbd>Ctrl →</kbd>
@@ -349,6 +381,7 @@
             <span>Undo</span><kbd>Ctrl Z</kbd>
             <span>Redo</span><kbd>Ctrl Shift Z</kbd>
             <span>Pan canvas</span><kbd>Space drag</kbd>
+            <span>Zoom canvas</span><kbd>Ctrl wheel</kbd>
             <span>Show this sheet</span><kbd>? button</kbd>
           </div>
         </div>
@@ -415,19 +448,18 @@
             <output id="welcomeStats" class="welcome-stats"></output>
           </div>
           <div class="welcome-section">
-            <div class="welcome-tutorial">
-              <button id="welcomeTutorialButton" type="button" data-icon="▶">Tutorial Mind</button>
-              <span>Guided map for notes, links, commands, and movement.</span>
+            <span class="welcome-label">Start with Template</span>
+            <div class="welcome-templates" id="welcomeTemplates">
+              <button type="button" data-template="project"><strong>Project Plan</strong><small>Goals, risks, next actions</small></button>
+              <button type="button" data-template="decision"><strong>Decision Map</strong><small>Options, evidence, stakeholders</small></button>
+              <button type="button" data-template="research"><strong>Research Notes</strong><small>Questions, sources, findings</small></button>
+              <button type="button" data-template="issues"><strong>Issue Tracker</strong><small>Open, active, waiting, done</small></button>
             </div>
           </div>
           <div class="welcome-section">
-            <span class="welcome-label">Templates</span>
-            <div class="welcome-templates" id="welcomeTemplates">
-              <button type="button" data-template="blank">Blank</button>
-              <button type="button" data-template="project">Project Plan</button>
-              <button type="button" data-template="decision">Decision Map</button>
-              <button type="button" data-template="research">Research Notes</button>
-              <button type="button" data-template="issues">Issue Tracker</button>
+            <div class="welcome-tutorial">
+              <button id="welcomeTutorialButton" type="button" data-icon="▶">Take 3-Minute Tutorial</button>
+              <span>Create, rename, note, link, and command from one guided mind.</span>
             </div>
           </div>
           <div class="welcome-section">
@@ -435,8 +467,8 @@
             <div id="welcomeRecent" class="welcome-recent"></div>
           </div>
           <div class="welcome-actions">
-            <button id="welcomeCommandButton" type="button" data-icon="⌘">Open Commands</button>
-            <button id="welcomeCloseButton" type="button" data-icon="✓">Start Mapping</button>
+            <button id="welcomeCommandButton" type="button" data-icon="⌕">Open Commands</button>
+            <button id="welcomeCloseButton" type="button" data-icon="✓">Blank Mind</button>
           </div>
         </div>
       </div>
@@ -450,6 +482,7 @@
     <script src="src/renderer.js"></script>
     <script src="src/tutorial.js"></script>
     <script src="src/controller.js"></script>
+    <script src="src/icons.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

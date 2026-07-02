@@ -255,15 +255,28 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
             raise AssertionError("Welcome dialog did not render logo")
         if "ConCen" not in (page.locator("#welcomeDialog").text_content() or ""):
             raise AssertionError("Welcome dialog did not render title")
+        welcome_text = page.locator("#welcomeDialog").text_content() or ""
+        for expected in ["Start with Template", "Take 3-Minute Tutorial", "Blank Mind"]:
+            if expected not in welcome_text:
+                raise AssertionError(f"Welcome dialog missing {expected}")
         page.locator("#welcomeCloseButton").click()
         page.locator("#brandLogoButton").click()
         page.wait_for_selector("#welcomeDialog:not([hidden])", timeout=3000)
         page.locator("#welcomeCloseButton").click()
         page.locator("#shortcutSheetButton").click()
         page.wait_for_selector("#shortcutSheet:not([hidden])", timeout=3000)
-        if "Ctrl K" not in (page.locator("#shortcutSheet").text_content() or ""):
-            raise AssertionError("Shortcut sheet did not render command shortcut")
+        shortcut_text = page.locator("#shortcutSheet").text_content() or ""
+        for expected in ["Ctrl K", "Arrows / WASD / HJKL", "Ctrl wheel", "Ctrl click", "Double click"]:
+            if expected not in shortcut_text:
+                raise AssertionError(f"Shortcut sheet missing {expected}")
         page.locator("#shortcutSheetCloseButton").click()
+        page.wait_for_timeout(100)
+        page.keyboard.press("Control+K")
+        page.wait_for_selector("#commandPalette:not([hidden])", timeout=3000)
+        page.locator("#commandInput").fill("zzzz-no-command")
+        if "Try node label, action name, or status" not in (page.locator("#commandResults").text_content() or ""):
+            raise AssertionError("Command palette no-results hint missing")
+        page.keyboard.press("Escape")
 
         initial_nodes = page.locator("#chartCanvas .node").count()
         if initial_nodes != 1:

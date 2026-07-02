@@ -1,6 +1,8 @@
 (function () {
   "use strict";
 
+  if (window.RingMapChart.icons) window.RingMapChart.icons.enhance(document);
+
   const app = new window.RingMapChart.Controller({
     svg: document.getElementById("chartCanvas"),
     pathTrail: document.getElementById("pathTrail"),
@@ -56,6 +58,10 @@
     radialViewButton: document.getElementById("radialViewButton"),
     bookViewButton: document.getElementById("bookViewButton"),
     documentViewButton: document.getElementById("documentViewButton"),
+    notesViewButton: document.getElementById("notesViewButton"),
+    notesDocument: document.getElementById("notesDocument"),
+    notesDocumentInput: document.getElementById("notesDocumentInput"),
+    notesRichEditor: document.getElementById("notesRichEditor"),
     layoutSettingsDropdown: document.getElementById("layoutSettingsDropdown"),
     layoutSettingsButton: document.getElementById("layoutSettingsButton"),
     layoutSettingsPanel: document.getElementById("layoutSettingsPanel"),
@@ -80,6 +86,7 @@
     backgroundEffectDropdown: document.getElementById("backgroundEffectDropdown"),
     backgroundImageUpload: document.getElementById("backgroundImageUpload"),
     backgroundImageInput: document.getElementById("backgroundImageInput"),
+    startScreensaverButton: document.getElementById("startScreensaverButton"),
     navigationModeInput: document.getElementById("navigationModeInput"),
     navigationModeDropdown: document.getElementById("navigationModeDropdown"),
     customThemeEditor: document.getElementById("customThemeEditor"),
@@ -141,7 +148,9 @@
       nodeFontSize: document.getElementById("nodeFontSizeRange")
     },
     layoutPresetButtons: Array.from(document.querySelectorAll("[data-layout-preset]")),
-    appearanceToggles: {}
+    appearanceToggles: {
+      screensaverEnabled: document.getElementById("screensaverEnabledInput")
+    }
   });
 
   app.start();

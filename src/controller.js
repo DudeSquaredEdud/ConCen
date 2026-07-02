@@ -9,6 +9,7 @@
   const UNDO_MAX_ITEMS = 40;
   const UNDO_MAX_BYTES = 2500000;
   const RECENT_MAX_ITEMS = 6;
+  const SCREENSAVER_IDLE_MS = 5 * 60 * 1000;
   const DEFAULT_BRANCH_COLORS = config.colors.slice();
   const LAYOUT_PRESETS = {
     compact: { treeLevelGap: 48, treeLeafGap: 56, ringBaseRadius: 68, ringDepthGap: 58, ringNodeGap: 4 },
@@ -122,6 +123,7 @@
     this.animatedNewNodeId = null;
     this.noteCloseTimer = null;
     this.noteSaveTimer = null;
+    this.noteSidebarSourceId = null;
     this.isSpaceDown = false;
     this.isPointerOverCanvas = false;
     this.isPanning = false;
@@ -144,10 +146,20 @@
     this.appDialogResolve = null;
     this.appDialogCancelValue = null;
     this.saveStateTimer = null;
+    this.statusMessageTimer = null;
+    this.tutorialGuide = null;
     this.recentMinds = [];
     this.githubSync = loadGithubSyncConfig();
     this.activeCustomSelect = null;
     this.layoutSettingsOpen = false;
+    this.notesDocumentDirty = false;
+    this.notesDocumentCommitTimer = null;
+    this.notesDocumentUndoPending = false;
+    this.notesRichLastBlock = null;
+    this.screensaverTimer = null;
+    this.screensaverActive = false;
+    this.boundScreensaverActivity = (event) => this.handleScreensaverActivity(event);
+    this.boundScreensaverVisibilityChange = () => this.handleScreensaverVisibilityChange();
   }
 
   Controller.prototype.start = function () {
@@ -156,6 +168,7 @@
     this.syncControls();
     this.render();
     this.showWelcomeIfNeeded();
+    this.resetScreensaverTimer();
     this.el.svg.focus();
   };
 
@@ -226,7 +239,7 @@
     if (this.el.shortcutSheet) this.el.shortcutSheet.addEventListener("pointerdown", (event) => {
       if (event.target === this.el.shortcutSheet) this.closeShortcutSheet();
     });
-    if (this.el.welcomeCloseButton) this.el.welcomeCloseButton.addEventListener("click", () => this.closeWelcome());
+    if (this.el.welcomeCloseButton) this.el.welcomeCloseButton.addEventListener("click", () => this.startBlankMind());
     if (this.el.welcomeCommandButton) this.el.welcomeCommandButton.addEventListener("click", () => {
       this.closeWelcome();
       this.openCommandPalette();
@@ -237,7 +250,7 @@
     });
     if (this.el.welcomeTemplates) this.el.welcomeTemplates.addEventListener("click", (event) => {
       const button = event.target.closest && event.target.closest("button[data-template]");
-      if (button) this.applyWelcomeTemplate(button.dataset.template);
+      if (button) this.applyWelcomeTemplate(button.dataset.template, { closeWelcome: true });
     });
     if (this.el.welcomeStyles) this.el.welcomeStyles.addEventListener("click", (event) => {
       const button = event.target.closest && event.target.closest("button[data-style]");
@@ -277,7 +290,10 @@
     [this.el.mindMenu, this.el.settingsMenu].forEach((menu) => {
       if (!menu) return;
       menu.addEventListener("toggle", () => {
-        if (!menu.open) return;
+        if (!menu.open) {
+          if (![this.el.mindMenu, this.el.settingsMenu].some((other) => other && other.open)) this.reclaimCanvasFocus();
+          return;
+        }
         [this.el.mindMenu, this.el.settingsMenu].forEach((other) => {
           if (other && other !== menu) other.open = false;
         });
@@ -291,6 +307,23 @@
     if (this.el.radialViewButton) this.el.radialViewButton.addEventListener("click", () => this.setViewMode("radial"));
     if (this.el.bookViewButton) this.el.bookViewButton.addEventListener("click", () => this.setViewMode("book"));
     if (this.el.documentViewButton) this.el.documentViewButton.addEventListener("click", () => this.setViewMode("document"));
+    if (this.el.notesViewButton) this.el.notesViewButton.addEventListener("click", () => this.setViewMode("notes"));
+    if (this.el.notesDocumentInput) {
+      this.el.notesDocumentInput.addEventListener("input", () => this.handleNotesDocumentInput());
+      this.el.notesDocumentInput.addEventListener("blur", () => this.commitNotesDocument());
+    }
+    if (this.el.notesRichEditor) {
+      this.el.notesRichEditor.addEventListener("input", () => this.handleNotesRichEditorInput());
+      this.el.notesRichEditor.addEventListener("keydown", (event) => this.handleNotesRichEditorKeyDown(event));
+      this.el.notesRichEditor.addEventListener("keyup", () => this.trackNotesRichBlock());
+      this.el.notesRichEditor.addEventListener("pointerup", () => this.trackNotesRichBlock());
+      this.el.notesRichEditor.addEventListener("focus", () => this.trackNotesRichBlock());
+      this.el.notesRichEditor.addEventListener("blur", () => {
+        this.normalizeNotesRichBlock(this.notesRichLastBlock);
+        this.notesRichLastBlock = null;
+        this.commitNotesDocument();
+      });
+    }
     if (this.el.layoutSettingsButton) this.el.layoutSettingsButton.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -318,6 +351,7 @@
       });
     }
     if (this.el.backgroundImageInput) this.el.backgroundImageInput.addEventListener("change", () => this.importBackgroundImage());
+    if (this.el.startScreensaverButton) this.el.startScreensaverButton.addEventListener("click", () => this.startScreensaverNow());
     if (this.el.navigationModeInput) {
       this.el.navigationModeInput.addEventListener("change", () => {
         this.appearance.navigationMode = storage.normalizeNavigationMode(this.el.navigationModeInput.value);
@@ -359,7 +393,14 @@
       input.addEventListener("change", () => {
         this.appearance[key] = Boolean(input.checked);
         this.syncAppearanceInputs(true);
+        this.syncScreensaverControls();
         this.save();
+        if (key === "screensaverEnabled") {
+          if (!this.appearance.screensaverEnabled) this.exitScreensaver();
+          this.resetScreensaverTimer();
+          this.updateStatus(this.appearance.screensaverEnabled ? "Screensaver enabled" : "Screensaver disabled");
+          return;
+        }
         this.scheduleRender(false);
       });
     });
@@ -489,6 +530,65 @@
       this.positionEditor();
       this.positionActionBar();
     });
+    this.bindScreensaverActivity();
+  };
+
+  Controller.prototype.bindScreensaverActivity = function () {
+    ["pointerdown", "pointermove", "wheel", "touchstart"].forEach((type) => {
+      window.addEventListener(type, this.boundScreensaverActivity, { passive: true });
+    });
+    window.addEventListener("keydown", this.boundScreensaverActivity);
+    document.addEventListener("visibilitychange", this.boundScreensaverVisibilityChange);
+  };
+
+  Controller.prototype.handleScreensaverActivity = function () {
+    if (this.screensaverActive) this.exitScreensaver();
+    this.resetScreensaverTimer();
+  };
+
+  Controller.prototype.isScreensaverEnabled = function () {
+    return this.appearance && this.appearance.screensaverEnabled === true;
+  };
+
+  Controller.prototype.handleScreensaverVisibilityChange = function () {
+    if (document.hidden) {
+      window.clearTimeout(this.screensaverTimer);
+      this.screensaverTimer = null;
+      return;
+    }
+    this.resetScreensaverTimer();
+  };
+
+  Controller.prototype.resetScreensaverTimer = function () {
+    window.clearTimeout(this.screensaverTimer);
+    this.screensaverTimer = null;
+    if (!this.isScreensaverEnabled() || document.hidden) return;
+    this.screensaverTimer = window.setTimeout(() => this.enterScreensaver(), SCREENSAVER_IDLE_MS);
+  };
+
+  Controller.prototype.startScreensaverNow = function () {
+    if (!this.isScreensaverEnabled()) {
+      this.updateStatus("Enable screensaver first");
+      return;
+    }
+    if (this.el.mindMenu) this.el.mindMenu.open = false;
+    if (this.el.settingsMenu) this.el.settingsMenu.open = false;
+    if (this.layoutSettingsOpen) this.closeLayoutSettings();
+    this.enterScreensaver();
+  };
+
+  Controller.prototype.enterScreensaver = function () {
+    if (!this.isScreensaverEnabled() || this.screensaverActive || document.hidden) return;
+    this.screensaverActive = true;
+    this.saveFocusedNote();
+    document.documentElement.dataset.screensaver = "active";
+  };
+
+  Controller.prototype.exitScreensaver = function () {
+    if (!this.screensaverActive) return;
+    this.screensaverActive = false;
+    delete document.documentElement.dataset.screensaver;
+    if (!utils.isEditableTarget(document.activeElement)) this.el.svg.focus();
   };
 
   Controller.prototype.handleCanvasKey = function (event) {
@@ -515,6 +615,7 @@
       this.addNode(true);
     } else if (this.keyToNavigationArrow(event)) {
       event.preventDefault();
+      this.saveFocusedNote();
       const mode = usesSpatialNavigation(this.viewMode) && !event.shiftKey ? "directional" : event.shiftKey ? "outline" : this.appearance.navigationMode;
       if (model.focusRelative(this.store, this.keyToNavigationArrow(event), this.positions, mode)) {
         this.actionBarOpen = false;
@@ -666,6 +767,7 @@
   };
 
   Controller.prototype.addNode = function (editAfterAdd) {
+    this.saveFocusedNote();
     const found = model.findNode(this.store.tree, this.store.focusedId);
     const map = this.currentMap();
     const sourceId = found && map ? model.sourceIdForViewNode(found.node, map.rootNodeId) : null;
@@ -680,9 +782,14 @@
     this.animatedNewNodeId = childId;
     this.actionBarOpen = false;
     this.refreshViewTree(childId);
+    if (this.el.noteSidebar && !this.el.noteSidebar.hidden) {
+      this.noteSidebarSourceId = childId;
+      this.syncNoteSidebar(true);
+    }
     this.afterTreeChange(true, true);
-    if (editAfterAdd) this.startEdit(childId);
-    else this.el.svg.focus();
+    const tutorialHandled = this.advanceTutorialGuide("created-child", { sourceId, childId });
+    if (editAfterAdd && !tutorialHandled) this.startEdit(childId);
+    else if (!tutorialHandled) this.el.svg.focus();
   };
 
   Controller.prototype.renameFocused = function () {
@@ -695,6 +802,7 @@
     this.pushUndoSnapshot();
     if (!model.renameMindNode(this.mind, sourceId, nextLabel)) return;
     if (found.node.id === model.ROOT_ID && map) map.title = this.mind.nodes[sourceId].label;
+    this.invalidateMindIndex();
     this.refreshViewTree(this.store.focusedId);
     this.afterTreeChange(true, true);
     this.el.svg.focus();
@@ -894,6 +1002,16 @@
     this.el.svg.focus();
   };
 
+  Controller.prototype.isStarterMind = function () {
+    return Object.keys(this.mind.nodes).length <= 1 && this.currentMindNode()?.label === "Chart Title";
+  };
+
+  Controller.prototype.startBlankMind = function () {
+    if (!this.isStarterMind()) this.newMind();
+    if (this.el.welcomeDialog && !this.el.welcomeDialog.hidden) this.closeWelcome();
+    this.updateStatus("Enter adds a child. Shift+Enter renames.");
+  };
+
   Controller.prototype.openParentMap = function () {
     const map = this.currentMap();
     if (!map || map.rootNodeId === this.mind.rootId) {
@@ -1031,18 +1149,22 @@
     const id = this.editingId;
     this.editingId = null;
     this.el.nodeEditor.hidden = true;
+    let sourceId = null;
+    let renamed = false;
     if (save) {
       const found = model.findNode(this.store.tree, id);
       const map = this.currentMap();
-      const sourceId = found && map ? model.sourceIdForViewNode(found.node, map.rootNodeId) : null;
+      sourceId = found && map ? model.sourceIdForViewNode(found.node, map.rootNodeId) : null;
       const nextLabel = utils.cleanLabel(this.el.nodeEditor.value);
       if (sourceId && nextLabel && this.mind.nodes[sourceId].label !== nextLabel) {
         this.pushUndoSnapshot();
         model.renameMindNode(this.mind, sourceId, nextLabel);
+        renamed = true;
       }
       this.refreshViewTree(id);
     }
     this.afterTreeChange(save, true);
+    this.advanceTutorialGuide("renamed-node", { sourceId, renamed });
     this.el.svg.focus();
   };
 
@@ -1074,6 +1196,7 @@
   };
 
   Controller.prototype.render = function () {
+    this.syncNotesDocumentView();
     const rect = this.el.svg.getBoundingClientRect();
     this.viewport = {
       width: Math.max(config.layout.minViewportWidth, rect.width || config.layout.minViewportWidth),
@@ -1095,6 +1218,10 @@
     const animatedFocusId = this.previousRenderedFocusId && this.previousRenderedFocusId !== this.store.focusedId ? this.store.focusedId : null;
     const animatedNewId = this.animatedNewNodeId;
 
+    if (this.viewMode === "notes") {
+      this.syncNotesDocument();
+    }
+
     this.renderer.render({
       tree: this.store.tree,
       nodes: layout.nodes,
@@ -1113,6 +1240,7 @@
     }, {
       focus: (id, event) => this.focusNode(id, event),
       edit: (id) => this.startEdit(id),
+      openNote: (id) => this.focusNode(id, { ctrlKey: true }),
       markdownAction: (action, event) => this.activateMarkdownAction(action, event),
       nodePointerDown: (event, id) => this.startNodeDrag(event, id)
     });
@@ -1219,8 +1347,16 @@
     });
     Object.entries(this.el.appearanceToggles || {}).forEach(([key, input]) => {
       if (!input) return;
-      input.checked = this.appearance[key] !== false;
+      input.checked = this.appearance[key] === true;
     });
+    this.syncScreensaverControls();
+  };
+
+  Controller.prototype.syncScreensaverControls = function () {
+    if (!this.el.startScreensaverButton) return;
+    const enabled = this.isScreensaverEnabled();
+    this.el.startScreensaverButton.disabled = !enabled;
+    this.el.startScreensaverButton.title = enabled ? "Start screensaver" : "Enable screensaver first";
   };
 
   Controller.prototype.syncGithubControls = function () {
@@ -1273,6 +1409,21 @@
     this.updateStatus(displayName ? "Author saved" : "Author cleared");
   };
 
+  Controller.prototype.reclaimCanvasFocus = function (options) {
+    if (!this.el.svg) return;
+    const force = Boolean(options && options.force);
+    if (!force && utils.isEditableTarget(document.activeElement)) return;
+    requestAnimationFrame(() => {
+      if (!this.el.svg) return;
+      if (!force && utils.isEditableTarget(document.activeElement)) return;
+      try {
+        this.el.svg.focus({ preventScroll: true });
+      } catch (error) {
+        this.el.svg.focus();
+      }
+    });
+  };
+
   Controller.prototype.updateStatus = function (message) {
     const found = model.findNode(this.store.tree, this.store.focusedId);
     if (!found) return;
@@ -1293,7 +1444,20 @@
     this.el.noteButton.disabled = false;
     this.syncMapSelect();
     this.updatePathTrail();
-    this.el.statusText.textContent = message || `${depthNames[node.depth]} focus | ${node.children.length}/12 children${canAdd ? "" : " | max reached"}`;
+    const focusedStatus = `${depthNames[node.depth]} focus | ${node.children.length}/12 children${canAdd ? "" : " | max reached"}`;
+    if (message) {
+      clearTimeout(this.statusMessageTimer);
+      this.el.statusText.textContent = message;
+      this.el.statusText.classList.add("is-toast");
+      this.statusMessageTimer = setTimeout(() => {
+        this.statusMessageTimer = null;
+        this.updateStatus();
+      }, 2000);
+      return;
+    }
+    if (this.statusMessageTimer) return;
+    this.el.statusText.classList.remove("is-toast");
+    this.el.statusText.textContent = focusedStatus;
   };
 
   Controller.prototype.syncViewModeControls = function () {
@@ -1305,6 +1469,7 @@
     if (this.el.radialViewButton) this.el.radialViewButton.setAttribute("aria-pressed", String(isRadial));
     if (this.el.bookViewButton) this.el.bookViewButton.setAttribute("aria-pressed", String(mode === "book"));
     if (this.el.documentViewButton) this.el.documentViewButton.setAttribute("aria-pressed", String(mode === "document"));
+    if (this.el.notesViewButton) this.el.notesViewButton.setAttribute("aria-pressed", String(mode === "notes"));
     this.syncLayoutSettingsControls();
   };
 
@@ -1352,6 +1517,7 @@
     if (this.el.layoutSettingsDropdown) this.el.layoutSettingsDropdown.classList.remove("is-open");
     this.el.layoutSettingsButton.setAttribute("aria-expanded", "false");
     this.el.layoutSettingsPanel.hidden = true;
+    this.reclaimCanvasFocus();
   };
 
   Controller.prototype.updatePathTrail = function () {
@@ -1695,7 +1861,11 @@
     this.el.noteSidebar.classList.remove("is-closing");
     this.el.noteSidebar.hidden = false;
     document.documentElement.dataset.noteSidebar = "open";
-    this.syncNoteSidebar();
+    this.noteSidebarSourceId = this.focusedSourceId();
+    this.syncNoteSidebar(true);
+    if (!this.advanceTutorialGuide("opened-note", { sourceId: this.focusedSourceId() })) {
+      this.updateStatus("Use [[Node Name]] to link ideas.");
+    }
     requestAnimationFrame(() => this.el.noteInput.focus());
   };
 
@@ -1717,19 +1887,27 @@
     this.noteCloseTimer = setTimeout(() => {
       this.el.noteSidebar.hidden = true;
       this.el.noteSidebar.classList.remove("is-closing");
+      this.noteSidebarSourceId = null;
       if (this.el.noteSidebar && this.el.noteSidebar.hidden) delete document.documentElement.dataset.noteSidebar;
     }, reducedMotion ? 1 : 130);
-    if (focusCanvas !== false) this.el.svg.focus();
+    if (focusCanvas !== false) this.reclaimCanvasFocus({ force: true });
+    this.advanceTutorialGuide("closed-note");
   };
 
   Controller.prototype.syncNoteSidebar = function (forceNoteInput) {
     if (!this.el.noteSidebar || this.el.noteSidebar.hidden) return;
-    const node = this.currentMindNode();
+    const sourceId = this.focusedSourceId();
+    const sourceChanged = Boolean(forceNoteInput && sourceId && this.noteSidebarSourceId && this.noteSidebarSourceId !== sourceId);
+    if (forceNoteInput && sourceId) this.noteSidebarSourceId = sourceId;
+    else if (!this.noteSidebarSourceId && sourceId) this.noteSidebarSourceId = sourceId;
+    const node = this.noteSidebarSourceId ? this.mind.nodes[this.noteSidebarSourceId] : null;
     if (!node) {
       this.el.noteSidebar.hidden = true;
+      this.noteSidebarSourceId = null;
       delete document.documentElement.dataset.noteSidebar;
       return;
     }
+    forceNoteInput = forceNoteInput || sourceChanged;
     this.el.noteSidebarTitle.textContent = node.label;
     if (this.el.nodeStatusInput) this.el.nodeStatusInput.value = node.status || "open";
     if (this.el.nodePriorityInput) this.el.nodePriorityInput.value = node.priority || "normal";
@@ -1749,8 +1927,8 @@
     if (!this.el.noteInput || this.el.noteSidebar.hidden) return;
     clearTimeout(this.noteSaveTimer);
     this.noteSaveTimer = null;
-    const sourceId = this.focusedSourceId();
-    if (!sourceId) return;
+    const sourceId = this.noteSidebarSourceId || this.focusedSourceId();
+    if (!sourceId || !this.mind.nodes[sourceId]) return;
     model.updateMindNodeNote(this.mind, sourceId, this.el.noteInput.value);
     model.updateMindNodeMeta(this.mind, sourceId, {
       status: this.el.nodeStatusInput ? this.el.nodeStatusInput.value : "open",
@@ -1763,6 +1941,7 @@
     this.renderNoteLinks(this.el.noteInput.value);
     this.renderBacklinks();
     this.scheduleRender(false);
+    this.advanceTutorialGuide("saved-note", { sourceId, note: this.el.noteInput.value });
   };
 
   Controller.prototype.scheduleFocusedNoteSave = function () {
@@ -1947,6 +2126,11 @@
     return sourceId ? this.mind.nodes[sourceId] : null;
   };
 
+  Controller.prototype.noteSidebarMindNode = function () {
+    const sourceId = this.noteSidebarSourceId || this.focusedSourceId();
+    return sourceId ? this.mind.nodes[sourceId] : null;
+  };
+
   Controller.prototype.invalidateMindIndex = function () {
     this.mindIndex = null;
   };
@@ -2047,7 +2231,7 @@
 
   Controller.prototype.closeCommandPalette = function () {
     this.el.commandPalette.hidden = true;
-    this.el.svg.focus();
+    this.reclaimCanvasFocus({ force: true });
   };
 
   Controller.prototype.openAppDialog = function (options) {
@@ -2067,6 +2251,7 @@
         if (action.icon) button.dataset.icon = action.icon;
         if (action.kind === "primary") button.classList.add("button-primary");
         if (action.kind === "danger") button.classList.add("button-danger");
+        if (RingMapChart.icons) RingMapChart.icons.enhance(button);
         button.addEventListener("click", () => this.closeAppDialog(action.value));
         this.el.appDialogActions.append(button);
       });
@@ -2090,7 +2275,7 @@
     const result = value === undefined ? this.appDialogCancelValue : value;
     this.appDialogCancelValue = null;
     if (resolve) resolve(result);
-    if (this.el.svg) this.el.svg.focus();
+    this.reclaimCanvasFocus({ force: true });
   };
 
   Controller.prototype.confirmAction = function (options) {
@@ -2128,7 +2313,7 @@
   Controller.prototype.closeShortcutSheet = function () {
     if (!this.el.shortcutSheet) return;
     this.el.shortcutSheet.hidden = true;
-    this.el.svg.focus();
+    this.reclaimCanvasFocus({ force: true });
   };
 
   Controller.prototype.showWelcomeIfNeeded = function () {
@@ -2161,9 +2346,10 @@
     try {
       localStorage.setItem(WELCOME_KEY, "seen");
     } catch (error) {
+      this.reclaimCanvasFocus({ force: true });
       return;
     }
-    this.el.svg.focus();
+    this.reclaimCanvasFocus({ force: true });
   };
 
   Controller.prototype.renderWelcome = function () {
@@ -2175,7 +2361,7 @@
     this.el.welcomeRecent.replaceChildren();
     if (!this.recentMinds.length) {
       const empty = document.createElement("span");
-      empty.textContent = "No recent minds yet";
+      empty.textContent = "Saved minds appear here. Import or start from template.";
       this.el.welcomeRecent.append(empty);
       return;
     }
@@ -2207,7 +2393,7 @@
   Controller.prototype.closeRecovery = function () {
     if (!this.el.recoveryDialog) return;
     this.el.recoveryDialog.hidden = true;
-    this.el.svg.focus();
+    this.reclaimCanvasFocus({ force: true });
   };
 
   Controller.prototype.renderRecovery = function () {
@@ -2322,10 +2508,9 @@
   };
 
   Controller.prototype.applyWelcomeTemplate = async function (template, options) {
-    if (template === "tutorial" && RingMapChart.tutorialSnapshot) return this.applyTutorialSnapshot(options);
     const tree = welcomeTemplateTree(template);
     if (!tree) return false;
-    const hasWork = Object.keys(this.mind.nodes).length > 1 || this.currentMindNode()?.label !== "Chart Title";
+    const hasWork = !this.isStarterMind();
     if (hasWork && !await this.confirmAction({
       title: "Load template",
       message: "Replace the current mind with this starter template?",
@@ -2351,7 +2536,7 @@
     this.render();
     this.renderWelcome();
     if (options && options.closeWelcome) this.closeWelcome();
-    this.updateStatus("Template loaded");
+    this.updateStatus(template === "blank" ? "Enter adds a child. Shift+Enter renames." : "Pick one node, then Ctrl+Enter opens notes.");
     return true;
   };
 
@@ -2394,7 +2579,178 @@
   Controller.prototype.startTutorial = async function () {
     if (!await this.applyWelcomeTemplate("tutorial", { closeWelcome: true })) return;
     this.createTutorialChapterMaps();
-    this.updateStatus("Tutorial loaded. Ctrl+click root node to begin.");
+    this.startTutorialGuide();
+  };
+
+  Controller.prototype.startTutorialGuide = function () {
+    const startSourceId = this.tutorialNodeSourceId("Start Here");
+    const createSourceId = this.tutorialNodeSourceId("Press Enter on me");
+    if (!startSourceId || !createSourceId) {
+      this.tutorialGuide = null;
+      this.updateStatus("Tutorial loaded. Follow note on right.");
+      return;
+    }
+    this.tutorialGuide = {
+      step: "create",
+      startSourceId,
+      createSourceId,
+      renameSourceId: "",
+      noteSourceId: "",
+      linkTargetSourceId: "",
+      findParentSourceId: "",
+      commandSourceId: ""
+    };
+    this.focusSourceId(createSourceId);
+    this.openNoteSidebar();
+    this.reclaimCanvasFocus({ force: true });
+    this.updateStatus("Step 1/4: press Enter to add an idea.");
+  };
+
+  Controller.prototype.tutorialNodeSourceId = function (label) {
+    const match = Object.values(this.mind.nodes).find((node) => node.label === label);
+    return match ? match.id : "";
+  };
+
+  Controller.prototype.advanceTutorialGuide = function (eventName, detail) {
+    const guide = this.tutorialGuide;
+    if (!guide) return false;
+    const payload = detail || {};
+    if (eventName === "created-child" && guide.step === "create" && payload.sourceId === guide.createSourceId) {
+      guide.renameSourceId = this.revealTutorialNode(guide.startSourceId, {
+        label: "Rename me",
+        note: "Give this idea a clearer name.",
+        status: "active",
+        priority: "high",
+        markerEnabled: true
+      });
+      this.showTutorialPause("rename", {
+        title: "New idea added",
+        message: "That is the basic move: pick an idea and press Enter to grow it. Next, give another idea a clearer name.",
+        run: () => {
+          guide.step = "rename";
+          this.focusSourceId(guide.renameSourceId);
+          this.startEdit(this.store.focusedId);
+          this.updateStatus("Step 2/4: type a short name, then press Enter.");
+        }
+      });
+      return true;
+    }
+    if (eventName === "renamed-node" && guide.step === "rename" && payload.sourceId === guide.renameSourceId && payload.renamed) {
+      this.showTutorialPause("note", {
+        title: "Name cleaned up",
+        message: "Short names keep the map easy to scan. Longer thoughts belong in notes. Next, add detail without crowding the map.",
+        run: () => {
+          guide.noteSourceId = this.revealTutorialNode(guide.startSourceId, {
+            label: "Add detail here",
+            note: "Write one sentence here, then add this link: [[Link target]].",
+            status: "active",
+            priority: "high",
+            markerEnabled: true
+          });
+          guide.linkTargetSourceId = this.revealTutorialNode(guide.startSourceId, {
+            label: "Link target",
+            note: "Links connect related ideas without moving them."
+          });
+          guide.step = "note";
+          this.focusSourceId(guide.noteSourceId);
+          this.openNoteSidebar();
+          this.updateStatus("Step 3/4: write one sentence with [[Link target]].");
+        }
+      });
+      return true;
+    }
+    if (eventName === "opened-note" && guide.step === "note" && payload.sourceId === guide.noteSourceId) {
+      this.updateStatus("Write one sentence, then type [[Link target]].");
+      return true;
+    }
+    if (eventName === "saved-note" && guide.step === "note" && payload.sourceId === guide.noteSourceId && /\[\[Link target\]\]/.test(payload.note || "")) {
+      guide.step = "close-note";
+      this.updateStatus("Link added. Press Esc when you are ready.");
+      return true;
+    }
+    if (eventName === "closed-note" && guide.step === "close-note") {
+      this.showTutorialPause("command", {
+        title: "Ideas connected",
+        message: "Now those two ideas point to each other. Next, use search to jump back to something without hunting around the map.",
+        run: () => {
+          guide.findParentSourceId = this.revealTutorialNode(this.mind.rootId, {
+            label: "Find Things",
+            note: "Search opens now. Use it to jump straight to the practice item.",
+            status: "active",
+            priority: "normal",
+            markerEnabled: true
+          });
+          guide.commandSourceId = this.revealTutorialNode(guide.findParentSourceId, {
+            label: "Find me from commands",
+            note: "Search can find ideas, notes, and actions."
+          });
+          this.revealTutorialNode(this.mind.rootId, {
+            label: "Learn more",
+            note: "Next moves: Alt+Enter opens a focused map. Space+drag pans. Ctrl+wheel zooms. Save copy exports a backup.",
+            status: "waiting",
+            priority: "normal"
+          });
+          guide.step = "command";
+          this.focusSourceId(guide.commandSourceId);
+          this.openCommandPalette();
+          this.updateStatus("Step 4/4: type Find me, then press Enter.");
+        }
+      });
+      return true;
+    }
+    if (eventName === "ran-command" && guide.step === "command" && payload.item && payload.item.kind === "node" && payload.item.sourceId === guide.commandSourceId) {
+      guide.step = "done";
+      this.showTutorialPause("done", {
+        title: "You have the loop",
+        message: "You added an idea, gave it a clear name, wrote detail, linked ideas, and found one again. That is enough to start real work.",
+        run: () => {
+          this.tutorialGuide = null;
+          this.updateStatus("Tutorial complete. Start from a template when ready.");
+        }
+      });
+      this.updateStatus("Tutorial complete. Start from a template when ready.");
+      return true;
+    }
+    return false;
+  };
+
+  Controller.prototype.showTutorialPause = async function (step, options) {
+    const guide = this.tutorialGuide;
+    if (!guide) return;
+    const pauseStep = "pause-" + step;
+    guide.step = pauseStep;
+    await this.chooseAction({
+      eyebrow: "Tutorial",
+      title: options.title,
+      message: options.message,
+      cancelValue: "continue",
+      actions: [{ label: "Continue", value: "continue", kind: "primary" }]
+    });
+    if (!this.tutorialGuide || this.tutorialGuide.step !== pauseStep) return;
+    options.run();
+  };
+
+  Controller.prototype.revealTutorialNode = function (parentSourceId, node) {
+    if (!parentSourceId || !node || !node.label) return "";
+    const existing = Object.values(this.mind.nodes).find((item) => item.label === node.label);
+    if (existing) return existing.id;
+    const parent = this.mind.nodes[parentSourceId];
+    if (!parent) return "";
+    const viewDepth = Math.max(0, mindPathItems(this.mind, parentSourceId).length - 1);
+    const sourceId = model.addMindChild(this.mind, parentSourceId, viewDepth, parent.children.length);
+    if (!sourceId) return "";
+    model.renameMindNode(this.mind, sourceId, node.label);
+    model.updateMindNodeNote(this.mind, sourceId, node.note || "");
+    model.updateMindNodeMeta(this.mind, sourceId, {
+      status: node.status || "open",
+      priority: node.priority || "normal",
+      markerEnabled: node.markerEnabled === true,
+      tags: node.tags || []
+    });
+    this.refreshViewTree(this.store.focusedId);
+    this.save();
+    this.scheduleRender(true);
+    return sourceId;
   };
 
   Controller.prototype.createTutorialChapterMaps = function () {
@@ -2455,7 +2811,7 @@
     });
     if (!this.paletteItems.length) {
       const empty = document.createElement("p");
-      empty.textContent = "No results";
+      empty.textContent = "No results. Try node label, action name, or status.";
       this.el.commandResults.append(empty);
     }
   };
@@ -2463,42 +2819,55 @@
   Controller.prototype.commandItems = function (query) {
     const focusedNode = this.currentMindNode();
     const mindIndex = this.getMindIndex();
-    const commands = [
+    const primaryCommands = [
       { kind: "command", title: "Add child", detail: "Enter", run: () => this.addNode(true) },
-      { kind: "command", title: "Show welcome", detail: "Templates, recents, shortcuts", run: () => this.openWelcome() },
+      { kind: "command", title: "Open note", detail: "Ctrl+Enter or Ctrl+click", run: () => this.openNoteSidebar() },
+      { kind: "command", title: "Edit label", detail: "Shift+Enter", run: () => this.startEdit(this.store.focusedId) },
+      { kind: "command", title: "Fit view", detail: "Toolbar focus", run: () => this.fitCurrentView() },
+      { kind: "command", title: focusedNode && focusedNode.markerEnabled ? "Hide marker" : "Show marker", detail: "Focused node", run: () => this.setFocusedMarker(!(focusedNode && focusedNode.markerEnabled)) },
+      { kind: "command", title: "Delete focused node", detail: "Delete or Backspace", run: () => this.deleteFocused() },
       { kind: "command", title: "Show shortcuts", detail: "Toolbar ?", run: () => this.openShortcutSheet() },
-      { kind: "command", title: "Find node", detail: "Type any node, note, tag, status, or priority", run: () => this.updateStatus("Type to search nodes and notes") },
+      { kind: "command", title: "Find node", detail: "Ctrl+K", run: () => this.updateStatus("Type to search nodes and notes") }
+    ];
+    const movementCommands = [
       { kind: "command", title: "Move focus", detail: "Arrows, WASD, HJKL", run: () => this.updateStatus("Move focus: arrows, WASD, or HJKL") },
       { kind: "command", title: "Tree movement", detail: "Shift+Arrow", run: () => this.updateStatus("Tree movement: Shift+Arrow") },
-      { kind: "command", title: "Pan canvas", detail: "Space+drag or wheel", run: () => this.updateStatus("Pan: Space+drag or wheel") },
-      { kind: "command", title: "Edit label", detail: "Shift+Enter", run: () => this.startEdit(this.store.focusedId) },
-      { kind: "command", title: "Delete focused node", detail: "Delete or Backspace", run: () => this.deleteFocused() },
+      { kind: "command", title: "Pan canvas", detail: "Space+drag or wheel", run: () => this.updateStatus("Pan: Space+drag or wheel. Zoom: Ctrl+wheel") },
       { kind: "command", title: "Parent or child map", detail: "Ctrl+Left / Ctrl+Right", run: () => this.updateStatus("Map nav: Ctrl+Left parent, Ctrl+Right child") },
-      { kind: "command", title: "New mind", detail: "Blank document", run: () => this.newMind() },
-      { kind: "command", title: "Save mind", detail: "Local autosave", run: () => this.save() },
-      { kind: "command", title: "Save copy", detail: ".mind.json", run: () => this.exportMind() },
-      { kind: "command", title: "Recovery", detail: "Backups and restore points", run: () => this.openRecovery() },
-      { kind: "command", title: "Push to GitHub", detail: "Commit current mind JSON", run: () => this.pushMindToGithub() },
-      { kind: "command", title: "Pull from GitHub", detail: "Replace current mind from repo", run: () => this.pullMindFromGithub() },
-      { kind: "command", title: "Clear recents", detail: "Remove stored snapshots", run: () => this.clearRecentMinds() },
-      { kind: "command", title: "Export theme", detail: ".concen-theme.json", run: () => this.exportTheme() },
-      { kind: "command", title: "Toggle notes", detail: "Ctrl+Enter or Ctrl+click", run: () => this.toggleNoteSidebar() },
-      { kind: "command", title: focusedNode && focusedNode.markerEnabled ? "Hide marker" : "Show marker", detail: "Focused node", run: () => this.setFocusedMarker(!(focusedNode && focusedNode.markerEnabled)) },
       { kind: "command", title: "Open node map", detail: "Alt+Enter", run: () => this.createMapFromFocusedNode() },
-      { kind: "command", title: "Create parent", detail: "Ctrl+Shift+Enter", run: () => this.createParentForFocusedNode() },
-      { kind: "command", title: "Toggle light/dark", detail: "Theme", run: () => this.toggleTheme() },
-      { kind: "command", title: "Next style", detail: "Style theme", run: () => this.cycleStylePreset() },
-      { kind: "command", title: "Next navigation mode", detail: "Arrow policy", run: () => this.cycleNavigationMode() },
-      { kind: "command", title: "Next view mode", detail: "Flat, radial, tree, book", run: () => this.toggleViewMode() },
+      { kind: "command", title: "Create parent", detail: "Ctrl+Shift+Enter", run: () => this.createParentForFocusedNode() }
+    ];
+    const viewCommands = [
+      { kind: "command", title: "Toggle notes", detail: "Ctrl+Enter", run: () => this.toggleNoteSidebar() },
+      { kind: "command", title: "Toggle theme", detail: "Light/dark", run: () => this.toggleTheme() },
+      { kind: "command", title: "Cycle style", detail: "Style preset", run: () => this.cycleStylePreset() },
+      { kind: "command", title: "Cycle navigation", detail: "Arrow policy", run: () => this.cycleNavigationMode() },
+      { kind: "command", title: "Next view mode", detail: "Flat, radial, tree, book, notes", run: () => this.toggleViewMode() },
       { kind: "command", title: "Flat view", detail: "Single outer ring", run: () => this.setViewMode("tree") },
       { kind: "command", title: "Radial view", detail: "Hierarchical scatter disk", run: () => this.setViewMode("radial") },
       { kind: "command", title: "Tree view", detail: "Structured columns", run: () => this.setViewMode("book") },
       { kind: "command", title: "Book view", detail: "Document outline", run: () => this.setViewMode("document") },
+      { kind: "command", title: "Notes view", detail: "Editable text document", run: () => this.setViewMode("notes") },
       { kind: "command", title: "Undo", detail: "Ctrl+Z", run: () => this.undo() },
       { kind: "command", title: "Redo", detail: "Ctrl+Shift+Z", run: () => this.redo() }
     ];
+    const workspaceCommands = [
+      { kind: "command", title: "Show welcome", detail: "Logo button", run: () => this.openWelcome() },
+      { kind: "command", title: "New mind", detail: "Blank document", run: () => this.newMind() },
+      { kind: "command", title: "Save mind", detail: "Local autosave", run: () => {
+        this.save();
+        this.updateStatus("Mind saved");
+      } },
+      { kind: "command", title: "Save copy", detail: ".mind.json", run: () => this.exportMind() },
+      { kind: "command", title: "Recovery", detail: "Backups and restore points", run: () => this.openRecovery() },
+      { kind: "command", title: "Clear recents", detail: "Remove stored snapshots", run: () => this.clearRecentMinds() },
+      { kind: "command", title: "Export theme", detail: ".concen-theme.json", run: () => this.exportTheme() },
+      { kind: "command", title: "Push to GitHub", detail: "Commit current mind JSON", run: () => this.pushMindToGithub() },
+      { kind: "command", title: "Pull from GitHub", detail: "Replace current mind from repo", run: () => this.pullMindFromGithub() }
+    ];
+    const metadataCommands = [];
     ["open", "active", "waiting", "done"].forEach((status) => {
-      commands.push({
+      metadataCommands.push({
         kind: "command",
         title: "Set status: " + titleCase(status),
         detail: "Focused node",
@@ -2507,7 +2876,7 @@
       });
     });
     ["low", "normal", "high", "critical"].forEach((priority) => {
-      commands.push({
+      metadataCommands.push({
         kind: "command",
         title: "Set priority: " + titleCase(priority),
         detail: "Focused node",
@@ -2539,7 +2908,7 @@
         text: ("open linked node link " + item.label).toLowerCase()
       })) : [];
     const moveTargets = this.moveTargetItems(query);
-    const all = commands.concat(moveTargets, linkedNodes, recent, nodes);
+    const all = primaryCommands.concat(moveTargets, linkedNodes, nodes, metadataCommands, movementCommands, viewCommands, recent, workspaceCommands);
     if (!query) return all;
     return all.filter((item) => (item.text || `${item.title} ${item.detail}`.toLowerCase()).includes(query));
   };
@@ -2550,6 +2919,7 @@
     else if (item.kind === "move-target") this.moveFocusedTo(item.sourceId);
     else if (item.kind === "recent") this.openRecentMind(item.recentId);
     else item.run();
+    this.advanceTutorialGuide("ran-command", { item });
   };
 
   Controller.prototype.moveTargetItems = function (query) {
@@ -2650,12 +3020,13 @@
   };
 
   Controller.prototype.toggleViewMode = function () {
-    const modes = ["tree", "radial", "book", "document"];
+    const modes = ["tree", "radial", "book", "document", "notes"];
     const index = modes.indexOf(this.viewMode);
     this.setViewMode(modes[(index + 1) % modes.length]);
   };
 
   Controller.prototype.setViewMode = function (mode) {
+    if (this.viewMode === "notes") this.commitNotesDocument();
     const nextMode = normalizeViewMode(mode);
     if (this.viewMode === nextMode) {
       this.syncViewModeControls();
@@ -2665,6 +3036,381 @@
     this.save();
     this.syncControls();
     this.scheduleRender(true);
+    if (nextMode === "notes" && this.el.notesRichEditor) {
+      requestAnimationFrame(() => this.el.notesRichEditor.focus());
+    }
+  };
+
+  Controller.prototype.syncNotesDocumentView = function () {
+    const notesActive = this.viewMode === "notes";
+    if (this.el.notesDocument) this.el.notesDocument.hidden = !notesActive;
+    if (this.el.svg) this.el.svg.classList.toggle("notes-view-hidden", notesActive);
+    if (notesActive) {
+      this.closeNoteSidebar(false);
+      this.hideEditor();
+      this.actionBarOpen = false;
+    }
+  };
+
+  Controller.prototype.handleNotesDocumentInput = function () {
+    this.notesDocumentDirty = true;
+    this.notesDocumentUndoPending = true;
+    this.renderNotesRichEditor();
+    clearTimeout(this.notesDocumentCommitTimer);
+    this.notesDocumentCommitTimer = setTimeout(() => this.commitNotesDocument(), 900);
+  };
+
+  Controller.prototype.handleNotesRichEditorKeyDown = function (event) {
+    if (event.key !== "Enter") return;
+    this.normalizeNotesRichBlock(this.currentNotesRichBlock());
+  };
+
+  Controller.prototype.handleNotesRichEditorInput = function () {
+    this.normalizeNotesRichEditorBlocks();
+    this.trackNotesRichBlock();
+    if (this.el.notesDocumentInput && this.el.notesRichEditor) {
+      this.el.notesDocumentInput.value = this.serializeNotesRichEditor();
+    }
+    this.notesDocumentDirty = true;
+    this.notesDocumentUndoPending = true;
+    clearTimeout(this.notesDocumentCommitTimer);
+    this.notesDocumentCommitTimer = setTimeout(() => this.commitNotesDocument(), 900);
+  };
+
+  Controller.prototype.syncNotesDocument = function () {
+    if (!this.el.notesDocumentInput || this.viewMode !== "notes") return;
+    if (document.activeElement === this.el.notesDocumentInput || document.activeElement === this.el.notesRichEditor) return;
+    const nextValue = this.serializeNotesDocument();
+    if (this.el.notesDocumentInput.value !== nextValue) this.el.notesDocumentInput.value = nextValue;
+    this.notesDocumentDirty = false;
+    this.renderNotesRichEditor();
+  };
+
+  Controller.prototype.renderNotesRichEditor = function () {
+    if (!this.el.notesDocumentInput || !this.el.notesRichEditor) return;
+    if (document.activeElement === this.el.notesRichEditor) return;
+    this.el.notesRichEditor.replaceChildren();
+    const lines = String(this.el.notesDocumentInput.value || "").replace(/\r\n?/g, "\n").split("\n");
+    const headingNodes = model.visibleNodes(this.store.tree).map((item) => item.node).filter((node) => node.depth > 0);
+    let headingIndex = 0;
+    let list = null;
+    const closeList = () => { list = null; };
+    lines.forEach((line) => {
+      const heading = line.match(/^(#{2,4})(?!#)\s+(.+)$/);
+      if (heading) {
+        closeList();
+        const level = heading[1].length;
+        const el = document.createElement("h" + level);
+        el.className = "notes-md-heading notes-md-heading-" + level;
+        this.appendInlineMarkdown(el, heading[2]);
+        this.appendNotesHeadingMeta(el, headingNodes[headingIndex++], level - 1);
+        this.el.notesRichEditor.append(el);
+        return;
+      }
+      const bullet = line.match(/^\s*[-*+]\s+(.+)$/);
+      if (bullet) {
+        if (!list) {
+          list = document.createElement("ul");
+          this.el.notesRichEditor.append(list);
+        }
+        const item = document.createElement("li");
+        this.appendInlineMarkdown(item, bullet[1]);
+        list.append(item);
+        return;
+      }
+      closeList();
+      const paragraph = document.createElement("p");
+      if (line.trim()) this.appendInlineMarkdown(paragraph, line);
+      else paragraph.append(document.createElement("br"));
+      this.el.notesRichEditor.append(paragraph);
+    });
+  };
+
+  Controller.prototype.trackNotesRichBlock = function () {
+    if (!this.el.notesRichEditor || document.activeElement !== this.el.notesRichEditor) return;
+    const block = this.currentNotesRichBlock();
+    if (block !== this.notesRichLastBlock) {
+      this.normalizeNotesRichBlock(this.notesRichLastBlock);
+      this.notesRichLastBlock = block;
+    }
+  };
+
+  Controller.prototype.currentNotesRichBlock = function () {
+    const selection = window.getSelection && window.getSelection();
+    const anchor = selection && selection.anchorNode;
+    if (!anchor || !this.el.notesRichEditor || !this.el.notesRichEditor.contains(anchor)) return null;
+    const element = anchor.nodeType === Node.ELEMENT_NODE ? anchor : anchor.parentElement;
+    return element && element.closest ? element.closest("h1,h2,h3,h4,p,div,li") : null;
+  };
+
+  Controller.prototype.normalizeNotesRichEditorBlocks = function () {
+    if (!this.el.notesRichEditor) return;
+    const current = this.currentNotesRichBlock();
+    Array.from(this.el.notesRichEditor.querySelectorAll("p,div")).forEach((block) => {
+      if (block !== current) this.normalizeNotesRichBlock(block);
+    });
+  };
+
+  Controller.prototype.normalizeNotesRichBlock = function (block) {
+    if (!block || !this.el.notesRichEditor || !this.el.notesRichEditor.contains(block)) return;
+    if (!/^P|DIV$/i.test(block.tagName || "")) return;
+    const text = block.textContent || "";
+    const heading = text.match(/^\s*(#{2,4})(?!#)\s+(.+)$/);
+    if (!heading) return;
+    const level = heading[1].length;
+    const next = document.createElement("h" + level);
+    next.className = "notes-md-heading notes-md-heading-" + level;
+    this.appendInlineMarkdown(next, heading[2]);
+    block.replaceWith(next);
+    if (this.el.notesDocumentInput) this.el.notesDocumentInput.value = this.serializeNotesRichEditor();
+    this.notesDocumentDirty = true;
+  };
+
+  Controller.prototype.appendNotesHeadingMeta = function (target, node, expectedDepth) {
+    if (!target || !node || node.depth !== expectedDepth) return;
+    const map = this.currentMap();
+    const sourceId = map ? model.sourceIdForViewNode(node, map.rootNodeId) : (node.sourceId || node.id);
+    if (!sourceId || !this.mind.nodes[sourceId]) return;
+    const meta = document.createElement("span");
+    meta.className = "notes-heading-meta";
+    meta.contentEditable = "false";
+    meta.append(
+      this.createNotesMetaSelect(sourceId, "status", node.status || "open", ["open", "active", "waiting", "done"]),
+      this.createNotesMetaSelect(sourceId, "priority", node.priority || "normal", ["low", "normal", "high", "critical"])
+    );
+    target.append(meta);
+  };
+
+  Controller.prototype.createNotesMetaSelect = function (sourceId, key, value, values) {
+    const select = document.createElement("select");
+    select.className = "notes-heading-" + key + " " + key + "-" + value;
+    select.setAttribute("aria-label", titleCase(key));
+    select.dataset.sourceId = sourceId;
+    select.dataset.metaKey = key;
+    values.forEach((optionValue) => {
+      const option = document.createElement("option");
+      option.value = optionValue;
+      option.textContent = titleCase(optionValue);
+      select.append(option);
+    });
+    select.value = value;
+    select.addEventListener("change", (event) => {
+      const next = event.currentTarget.value;
+      event.currentTarget.className = "notes-heading-" + key + " " + key + "-" + next;
+      this.updateNotesHeadingMeta(sourceId, key, next);
+    });
+    return select;
+  };
+
+  Controller.prototype.updateNotesHeadingMeta = function (sourceId, key, value) {
+    const node = this.mind.nodes[sourceId];
+    if (!node || (key !== "status" && key !== "priority")) return;
+    const next = {
+      status: node.status || "open",
+      priority: node.priority || "normal",
+      markerEnabled: node.markerEnabled === true,
+      tags: node.tags || []
+    };
+    next[key] = value;
+    model.updateMindNodeMeta(this.mind, sourceId, next);
+    this.refreshViewTree(this.store.focusedId);
+    this.save();
+    this.scheduleRender(false);
+  };
+
+  Controller.prototype.serializeNotesRichEditor = function () {
+    if (!this.el.notesRichEditor) return "";
+    const lines = [];
+    Array.from(this.el.notesRichEditor.children).forEach((block) => {
+      const tag = block.tagName;
+      if (/^H[2-4]$/.test(tag)) {
+        lines.push("#".repeat(Number(tag.slice(1))) + " " + serializeInlineMarkdown(block));
+        lines.push("");
+        return;
+      }
+      if (tag === "UL" || tag === "OL") {
+        Array.from(block.children).forEach((item, index) => {
+          const prefix = tag === "OL" ? String(index + 1) + ". " : "- ";
+          lines.push(prefix + serializeInlineMarkdown(item));
+        });
+        lines.push("");
+        return;
+      }
+      const text = serializeInlineMarkdown(block);
+      lines.push(text);
+      if (text) lines.push("");
+    });
+    return lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+  };
+
+  Controller.prototype.appendInlineMarkdown = function (target, source) {
+    const pattern = /(\*\*([^*]+)\*\*)|(__([^_]+)__)|(~~([^~]+)~~)|(`([^`]+)`)|(==([^=]+)==)|(!?\[([^\]]*)\]\(([^)]+)\))|(\[\[([^\]|]+)\|([^\]]+)\]\])|(\[\[([^\]]+)\]\])/g;
+    let cursor = 0;
+    const appendText = (value) => {
+      if (value) target.append(document.createTextNode(value));
+    };
+    String(source || "").replace(pattern, (match, boldA, boldTextA, boldB, boldTextB, strikeA, strikeText, codeA, codeText, markA, markText, linkA, linkText, linkHref, wikiAliasA, wikiTarget, wikiLabel, wikiA, wikiOnly, offset) => {
+      appendText(source.slice(cursor, offset));
+      cursor = offset + match.length;
+      let el = null;
+      if (boldA || boldB) {
+        el = document.createElement("strong");
+        el.textContent = boldTextA || boldTextB || "";
+      } else if (strikeA) {
+        el = document.createElement("s");
+        el.textContent = strikeText || "";
+      } else if (codeA) {
+        el = document.createElement("code");
+        el.textContent = codeText || "";
+      } else if (markA) {
+        el = document.createElement("mark");
+        el.textContent = markText || "";
+      } else if (linkA) {
+        el = document.createElement(match.startsWith("!") ? "span" : "a");
+        el.textContent = match.startsWith("!") ? "▣ " + (linkText || "image") : (linkText || linkHref || "link");
+        if (!match.startsWith("!")) {
+          el.href = linkHref || "#";
+          el.target = "_blank";
+          el.rel = "noopener noreferrer";
+        }
+      } else if (wikiAliasA || wikiA) {
+        el = document.createElement("button");
+        el.type = "button";
+        el.className = "notes-md-wikilink";
+        el.textContent = wikiLabel || wikiOnly || "node";
+        el.addEventListener("click", () => {
+          const node = linkedNode(wikiTarget || wikiOnly, this.mind, this.getMindIndex());
+          if (node) this.focusSourceId(node.id);
+          else this.updateStatus("Linked node not found");
+        });
+      }
+      if (el) target.append(el);
+      return match;
+    });
+    appendText(String(source || "").slice(cursor));
+  };
+
+  Controller.prototype.serializeNotesDocument = function () {
+    const lines = [];
+    const appendBlank = () => {
+      if (lines.length && lines[lines.length - 1] !== "") lines.push("");
+    };
+    const visit = (node) => {
+      if (node.depth > 0) lines.push("#".repeat(Math.min(node.depth + 1, 4)) + " " + (node.label || model.defaultLabel(node.depth, 0)));
+      const note = String(node.note || "").trim();
+      if (note) {
+        appendBlank();
+        note.split(/\n/).forEach((line) => lines.push(line));
+      }
+      node.children.forEach((child) => {
+        appendBlank();
+        visit(child);
+      });
+    };
+    visit(this.store.tree);
+    return lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+  };
+
+  Controller.prototype.commitNotesDocument = function () {
+    if (!this.el.notesDocumentInput || !this.notesDocumentDirty) return false;
+    clearTimeout(this.notesDocumentCommitTimer);
+    this.notesDocumentCommitTimer = null;
+    const parsed = this.parseNotesDocument(this.el.notesDocumentInput.value);
+    if (!parsed) {
+      this.notesDocumentDirty = false;
+      return false;
+    }
+    if (this.notesDocumentUndoPending) this.pushUndoSnapshot();
+    this.notesDocumentUndoPending = false;
+    this.replaceCurrentSubtreeFromNotes(parsed);
+    this.notesDocumentDirty = false;
+    this.refreshViewTree(this.store.focusedId);
+    this.afterTreeChange(true, true);
+    this.updateStatus("Notes synced to nodes");
+    return true;
+  };
+
+  Controller.prototype.parseNotesDocument = function (raw) {
+    const fallbackLabel = this.store.tree.label || "Chart Title";
+    const root = { label: fallbackLabel, noteLines: [], children: [] };
+    const stack = [root];
+    let current = root;
+    String(raw || "").replace(/\r\n?/g, "\n").split("\n").forEach((line) => {
+      const heading = line.match(/^(#{2,4})(?!#)\s+(.+)$/);
+      if (heading) {
+        const depth = Math.min(heading[1].length - 1, config.limits.maxDepth);
+        const parentDepth = Math.max(0, depth - 1);
+        const parent = stack[parentDepth] || root;
+        if (parent.children.length >= config.limits.maxChildren) {
+          current = parent;
+          return;
+        }
+        const node = {
+          label: utils.cleanLabel(heading[2]) || model.defaultLabel(depth, parent.children.length),
+          noteLines: [],
+          children: []
+        };
+        parent.children.push(node);
+        stack.length = depth + 1;
+        stack[depth] = node;
+        current = node;
+        return;
+      }
+      current.noteLines.push(line);
+    });
+    return root;
+  };
+
+  Controller.prototype.replaceCurrentSubtreeFromNotes = function (parsedRoot) {
+    const map = this.currentMap();
+    const rootSourceId = map && map.rootNodeId && this.mind.nodes[map.rootNodeId] ? map.rootNodeId : this.mind.rootId;
+    const oldByPath = new Map();
+    const oldIds = new Set();
+    const collectOld = (sourceId, path) => {
+      const node = this.mind.nodes[sourceId];
+      if (!node) return;
+      oldByPath.set(path, node);
+      oldIds.add(sourceId);
+      node.children.forEach((childId, index) => collectOld(childId, path ? path + "." + index : String(index)));
+    };
+    collectOld(rootSourceId, "");
+
+    const usedIds = new Set();
+    const nextId = () => {
+      let id;
+      do {
+        id = "node-" + this.mind.idCounter++;
+      } while (this.mind.nodes[id] || usedIds.has(id));
+      return id;
+    };
+    const noteText = (node) => utils.cleanNote((node.noteLines || []).join("\n").trim());
+    const build = (input, path, sourceId) => {
+      const existing = oldByPath.get(path);
+      const id = sourceId || (existing && existing.id) || nextId();
+      usedIds.add(id);
+      const childIds = input.children.map((child, index) => build(child, path ? path + "." + index : String(index)));
+      const previous = this.mind.nodes[id] || {};
+      this.mind.nodes[id] = {
+        id,
+        label: utils.cleanLabel(input.label) || previous.label || "Chart Title",
+        note: noteText(input),
+        status: previous.status || "open",
+        priority: previous.priority || "normal",
+        markerEnabled: previous.markerEnabled === true,
+        tags: previous.tags || [],
+        children: childIds
+      };
+      return id;
+    };
+
+    build(parsedRoot, "", rootSourceId);
+    oldIds.forEach((id) => {
+      if (!usedIds.has(id) && id !== rootSourceId) delete this.mind.nodes[id];
+    });
+    this.maps = this.maps.filter((item) => this.mind.nodes[item.rootNodeId]);
+    if (!this.maps.some((item) => item.id === this.activeMapId)) this.activeMapId = this.maps[0] ? this.maps[0].id : null;
+    if (map && this.mind.nodes[rootSourceId]) map.title = this.mind.nodes[rootSourceId].label;
+    this.invalidateMindIndex();
   };
 
   Controller.prototype.applyLayoutPreset = function (presetName) {
@@ -3456,8 +4202,32 @@
     };
   }
 
+
+  function serializeInlineMarkdown(node) {
+    if (!node) return "";
+    return Array.from(node.childNodes).map((child) => {
+      if (child.nodeType === Node.TEXT_NODE) return child.textContent || "";
+      if (child.nodeType !== Node.ELEMENT_NODE) return "";
+      if (child.classList && child.classList.contains("notes-heading-meta")) return "";
+      const tag = child.tagName;
+      const inner = serializeInlineMarkdown(child);
+      if (tag === "BR") return "";
+      if (tag === "STRONG" || tag === "B") return inner ? "**" + inner + "**" : "";
+      if (tag === "EM" || tag === "I") return inner ? "*" + inner + "*" : "";
+      if (tag === "S" || tag === "DEL") return inner ? "~~" + inner + "~~" : "";
+      if (tag === "CODE") return inner ? "`" + inner.replace(/`/g, "") + "`" : "";
+      if (tag === "MARK") return inner ? "==" + inner + "==" : "";
+      if (tag === "A") {
+        const href = child.getAttribute("href") || inner;
+        return inner ? "[" + inner + "](" + href + ")" : href;
+      }
+      if (child.classList && child.classList.contains("notes-md-wikilink")) return inner ? "[[" + inner + "]]" : "";
+      return inner;
+    }).join("").replace(/\u00a0/g, " ").trim();
+  }
+
   function normalizeViewMode(mode) {
-    return ["tree", "radial", "book", "document"].includes(mode) ? mode : "radial";
+    return ["tree", "radial", "book", "document", "notes"].includes(mode) ? mode : "radial";
   }
 
   function usesSpatialNavigation(mode) {
@@ -3938,6 +4708,7 @@
   }
 
   function welcomeTemplateTree(template) {
+    if (template === "tutorial" && RingMapChart.tutorialTemplateTree) return RingMapChart.tutorialTemplateTree();
     const child = (label, children, note, status, priority) => ({
       label,
       note: note || "",
@@ -3949,63 +4720,7 @@
     });
     const templates = {
       blank: child("Chart Title", []),
-      tutorial: child("Ctrl+click this node", [
-        child("Chapter 1: Basics", [
-          child("1. Select Nodes", [
-            child("Click Practice", [], "Click this node. Notice the focus ring and action bar."),
-            child("2. Add Children", [
-              child("Add Here", [], "Focus this node and press Enter. A child appears. You can delete practice children later."),
-              child("3. Rename", [], "Focus this node, press Shift+Enter, type a new label, then press Enter.")
-            ], "Focus [[Add Here]], then press Enter once. That creates a child under the focused node. Next: [[3. Rename]].", "open")
-          ], "Click any node to focus it. Focus decides where Enter, notes, and commands apply. Task: click [[Click Practice]]. Next: [[2. Add Children]].", "active", "high"),
-          child("Chapter 2: Notes", [
-            child("1. Inspector", [
-              child("Return Focus", [], "Press Ctrl+Enter while this note is open. Focus returns to this node."),
-              child("2. Metadata", [
-                child("Status Example", [], "Change status to Active and priority to High. Turn marker on to see the symbol."),
-                child("3. Tags", [], "Add tag tutorial, then search tutorial from Ctrl+K.")
-              ], "Status colors the priority marker. Priority changes the symbol. Task: edit [[Status Example]]. Next: [[3. Tags]].", "open")
-            ], "Ctrl+Enter opens and closes the inspector. Task: click [[Return Focus]], open notes, then Ctrl+Enter back to canvas. Next: [[2. Metadata]].", "active"),
-            child("Chapter 3: Links", [
-              child("1. Type Link", [
-                child("Link Target", [], "This is target for practice links."),
-                child("2. Backlinks", [
-                  child("Backlink Target", [], "This node is linked from lesson note. Linked from should show where it came from."),
-                  child("3. Follow Path", [], "Click this node, then use map path controls above canvas.")
-                ], "This note links to [[Backlink Target]]. Open that node and watch Linked from appear. Next: [[3. Follow Path]].", "open")
-              ], "Type [[ in this note and choose Link Target. After inserting, look below note for link chip. Next: [[2. Backlinks]].", "active"),
-              child("Chapter 4: Commands", [
-                child("1. Search", [
-                  child("Find This Node", [], "Press Ctrl+K, type Find This, press Enter."),
-                  child("2. Actions", [
-                    child("Action Target", [], "Use Ctrl+K and type marker, status, or priority while this node is focused."),
-                    child("3. Move Command", [], "Focus this node, press Ctrl+K, type move, choose Action Target.")
-                  ], "Commands can edit focused node. Task: focus [[Action Target]], press Ctrl+K, type marker. Next: [[3. Move Command]].", "open")
-                ], "Ctrl+K searches labels, notes, tags, status, and priority. Task: search for [[Find This Node]]. Next: [[2. Actions]].", "active"),
-                child("Chapter 5: Moving", [
-                  child("1. Drag Move", [
-                    child("Drag Me", [], "Drag this node onto Drop Zone."),
-                    child("Drop Zone", [], "Drop Drag Me here."),
-                    child("2. Animation", [
-                      child("Watch Siblings", [], "When nodes shift, they settle with a short animation."),
-                      child("3. Safety", [], "Use Ctrl+Z after a move if you dislike result.")
-                    ], "Moves displace nearby nodes. Watch siblings settle after move. Next: [[3. Safety]].", "open")
-                  ], "Drag one node onto another to make it child. Task: drag [[Drag Me]] onto [[Drop Zone]]. Next: [[2. Animation]].", "active"),
-                  child("Chapter 6: Maps", [
-                    child("1. Open Map", [
-                      child("Nested Practice", [], "Focus this node and press Alt+Enter to open it as its own map."),
-                      child("2. Map Path", [
-                        child("Path Buttons", [], "Use path buttons above canvas to climb back to parent maps."),
-                        child("3. Finish", [], "Open Welcome from Ctrl+K, then choose real template or blank mind. Done.")
-                      ], "Path buttons show where this map lives. Next: [[3. Finish]].", "open")
-                    ], "Any node can become map. Task: focus [[Nested Practice]], press Alt+Enter. Next: [[2. Map Path]].", "active")
-                  ], "Maps keep large topics focused. Start at [[1. Open Map]]. Return to previous view with Ctrl+Left or path trail above canvas.", "done")
-                ], "This chapter is practice sandbox for reparenting. Start at [[1. Drag Move]]. Next chapter is child node [[Chapter 6: Maps]].", "waiting")
-              ], "Ctrl+K is search plus action palette. Start at [[1. Search]]. Next chapter is child node [[Chapter 5: Moving]].", "open")
-            ], "Links use exact node labels inside double brackets. Start at [[1. Type Link]]. Next chapter is child node [[Chapter 4: Commands]].", "waiting")
-          ], "Notes hold details without crowding ring. Start at [[1. Inspector]]. Next chapter is child node [[Chapter 3: Links]].", "open")
-        ], "Open this chapter with Alt+Enter. It contains basics lessons and child node [[Chapter 2: Notes]]. Return to previous view with Ctrl+Left or path trail above canvas.", "active", "high")
-      ], "Start here. Ctrl+click opened this note.\n\nNext: click [[Chapter 1: Basics]], then press Alt+Enter to enter chapter map.\n\nChapters are nested one inside previous, so each chapter view stays focused. Return with Ctrl+Left or path trail above canvas.", "active", "critical"),
+      tutorial: child("Tutorial Mind", [], "Tutorial source did not load. Refresh the page and try again.", "waiting", "high"),
       project: child("Project Plan", [
         child("Goals", [child("Outcome"), child("Constraints")]),
         child("Workstreams", [child("Design"), child("Build"), child("Launch")]),
