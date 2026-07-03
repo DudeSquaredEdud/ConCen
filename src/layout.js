@@ -81,16 +81,16 @@
     function contentProfile(viewMode, depth) {
       const profiles = {
         book: {
-          0: { width: 460, minHeight: 124, labelChars: 25, labelLines: 2, noteChars: 54, noteLines: Infinity, paddingY: 24, labelLineHeight: 29, noteGap: 14, noteLineHeight: 16 },
-          1: { width: 360, minHeight: 86, labelChars: 25, labelLines: 2, noteChars: 44, noteLines: Infinity, paddingY: 17, labelLineHeight: 22, noteGap: 11, noteLineHeight: 15 },
-          2: { width: 390, minHeight: 82, labelChars: 30, labelLines: 2, noteChars: 48, noteLines: Infinity, paddingY: 16, labelLineHeight: 20, noteGap: 10, noteLineHeight: 14 },
-          3: { width: 330, minHeight: 72, labelChars: 26, labelLines: 2, noteChars: 40, noteLines: Infinity, paddingY: 14, labelLineHeight: 18, noteGap: 8, noteLineHeight: 13 }
+          0: { width: 460, minHeight: 124, labelChars: 25, labelLines: 2, noteChars: 54, noteLines: Infinity, paddingY: 24, labelLineHeight: 31, noteGap: 16, noteLineHeight: 21 },
+          1: { width: 360, minHeight: 86, labelChars: 25, labelLines: 2, noteChars: 44, noteLines: Infinity, paddingY: 17, labelLineHeight: 24, noteGap: 13, noteLineHeight: 19 },
+          2: { width: 390, minHeight: 82, labelChars: 30, labelLines: 2, noteChars: 48, noteLines: Infinity, paddingY: 16, labelLineHeight: 22, noteGap: 12, noteLineHeight: 18 },
+          3: { width: 330, minHeight: 72, labelChars: 26, labelLines: 2, noteChars: 40, noteLines: Infinity, paddingY: 14, labelLineHeight: 20, noteGap: 10, noteLineHeight: 17 }
         },
         document: {
-          0: { width: 780, minHeight: 132, labelChars: 40, labelLines: 2, noteChars: 86, noteLines: Infinity, paddingY: 28, labelLineHeight: 34, noteGap: 16, noteLineHeight: 17 },
-          1: { width: 760, minHeight: 92, labelChars: 52, labelLines: 2, noteChars: 84, noteLines: Infinity, paddingY: 18, labelLineHeight: 25, noteGap: 12, noteLineHeight: 16 },
-          2: { width: 720, minHeight: 78, labelChars: 56, labelLines: 2, noteChars: 80, noteLines: Infinity, paddingY: 15, labelLineHeight: 21, noteGap: 10, noteLineHeight: 15 },
-          3: { width: 680, minHeight: 68, labelChars: 58, labelLines: 2, noteChars: 76, noteLines: Infinity, paddingY: 13, labelLineHeight: 18, noteGap: 8, noteLineHeight: 14 }
+          0: { width: 780, minHeight: 132, labelChars: 40, labelLines: 2, noteChars: 86, noteLines: Infinity, paddingY: 28, labelLineHeight: 36, noteGap: 18, noteLineHeight: 22 },
+          1: { width: 760, minHeight: 92, labelChars: 52, labelLines: 2, noteChars: 84, noteLines: Infinity, paddingY: 18, labelLineHeight: 27, noteGap: 14, noteLineHeight: 20 },
+          2: { width: 720, minHeight: 78, labelChars: 56, labelLines: 2, noteChars: 80, noteLines: Infinity, paddingY: 15, labelLineHeight: 23, noteGap: 12, noteLineHeight: 19 },
+          3: { width: 680, minHeight: 68, labelChars: 58, labelLines: 2, noteChars: 76, noteLines: Infinity, paddingY: 13, labelLineHeight: 20, noteGap: 10, noteLineHeight: 18 }
         }
       };
       return (profiles[viewMode] && profiles[viewMode][depth]) || profiles[viewMode][3];

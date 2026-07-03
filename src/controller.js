@@ -313,6 +313,7 @@
       this.el.notesDocumentInput.addEventListener("blur", () => this.commitNotesDocument());
     }
     if (this.el.notesRichEditor) {
+      this.el.notesRichEditor.addEventListener("paste", (event) => this.handleNotesRichEditorPaste(event));
       this.el.notesRichEditor.addEventListener("input", () => this.handleNotesRichEditorInput());
       this.el.notesRichEditor.addEventListener("keydown", (event) => this.handleNotesRichEditorKeyDown(event));
       this.el.notesRichEditor.addEventListener("keyup", () => this.trackNotesRichBlock());
@@ -3026,7 +3027,7 @@
   };
 
   Controller.prototype.setViewMode = function (mode) {
-    if (this.viewMode === "notes") this.commitNotesDocument();
+    if (this.viewMode === "notes") this.commitNotesDocument({ autoEnter: true });
     const nextMode = normalizeViewMode(mode);
     if (this.viewMode === nextMode) {
       this.syncViewModeControls();
@@ -3065,6 +3066,20 @@
     this.normalizeNotesRichBlock(this.currentNotesRichBlock());
   };
 
+  Controller.prototype.handleNotesRichEditorPaste = function (event) {
+    const text = event.clipboardData && event.clipboardData.getData("text/plain");
+    if (!text || !this.el.notesDocumentInput) return;
+    event.preventDefault();
+    this.el.notesDocumentInput.value = String(text).replace(/\r\n?/g, "\n");
+    this.notesDocumentPendingEnterSourceId = null;
+    this.notesDocumentDirty = true;
+    this.notesDocumentUndoPending = true;
+    this.renderNotesRichEditor({ force: true });
+    this.focusNotesRichEditorEnd();
+    clearTimeout(this.notesDocumentCommitTimer);
+    this.notesDocumentCommitTimer = setTimeout(() => this.commitNotesDocument(), 250);
+  };
+
   Controller.prototype.handleNotesRichEditorInput = function () {
     this.normalizeNotesRichEditorBlocks();
     this.trackNotesRichBlock();
@@ -3086,9 +3101,10 @@
     this.renderNotesRichEditor();
   };
 
-  Controller.prototype.renderNotesRichEditor = function () {
+  Controller.prototype.renderNotesRichEditor = function (options) {
+    const force = options && options.force === true;
     if (!this.el.notesDocumentInput || !this.el.notesRichEditor) return;
-    if (document.activeElement === this.el.notesRichEditor) return;
+    if (!force && document.activeElement === this.el.notesRichEditor) return;
     this.el.notesRichEditor.replaceChildren();
     const lines = String(this.el.notesDocumentInput.value || "").replace(/\r\n?/g, "\n").split("\n");
     const headingNodes = model.visibleNodes(this.store.tree).map((item) => item.node).filter((node) => node.depth > 0);
@@ -3096,7 +3112,7 @@
     let list = null;
     const closeList = () => { list = null; };
     lines.forEach((line) => {
-      const heading = line.match(/^(#{2,4})(?!#)\s+(.+)$/);
+      const heading = line.match(/^(#{1,4})(?!#)\s+(.+)$/);
       if (heading) {
         closeList();
         const level = heading[1].length;
@@ -3143,6 +3159,17 @@
     return element && element.closest ? element.closest("h1,h2,h3,h4,p,div,li") : null;
   };
 
+  Controller.prototype.focusNotesRichEditorEnd = function () {
+    if (!this.el.notesRichEditor || !window.getSelection || !document.createRange) return;
+    this.el.notesRichEditor.focus();
+    const range = document.createRange();
+    range.selectNodeContents(this.el.notesRichEditor);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
+
   Controller.prototype.normalizeNotesRichEditorBlocks = function () {
     if (!this.el.notesRichEditor) return;
     const current = this.currentNotesRichBlock();
@@ -3155,7 +3182,7 @@
     if (!block || !this.el.notesRichEditor || !this.el.notesRichEditor.contains(block)) return;
     if (!/^P|DIV$/i.test(block.tagName || "")) return;
     const text = block.textContent || "";
-    const heading = text.match(/^\s*(#{2,4})(?!#)\s+(.+)$/);
+    const heading = text.match(/^\s*(#{1,4})(?!#)\s+(.+)$/);
     if (!heading) return;
     const level = heading[1].length;
     const next = document.createElement("h" + level);
@@ -3223,7 +3250,7 @@
     const lines = [];
     Array.from(this.el.notesRichEditor.children).forEach((block) => {
       const tag = block.tagName;
-      if (/^H[2-4]$/.test(tag)) {
+      if (/^H[1-4]$/.test(tag)) {
         lines.push("#".repeat(Number(tag.slice(1))) + " " + serializeInlineMarkdown(block));
         lines.push("");
         return;
@@ -3311,8 +3338,12 @@
     return lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
   };
 
-  Controller.prototype.commitNotesDocument = function () {
-    if (!this.el.notesDocumentInput || !this.notesDocumentDirty) return false;
+  Controller.prototype.commitNotesDocument = function (options) {
+    const autoEnter = options && options.autoEnter === true;
+    if (!this.el.notesDocumentInput || !this.notesDocumentDirty) {
+      if (autoEnter) return this.enterPendingNotesChildMap();
+      return false;
+    }
     clearTimeout(this.notesDocumentCommitTimer);
     this.notesDocumentCommitTimer = null;
     const parsed = this.parseNotesDocument(this.el.notesDocumentInput.value);
@@ -3322,23 +3353,47 @@
     }
     if (this.notesDocumentUndoPending) this.pushUndoSnapshot();
     this.notesDocumentUndoPending = false;
-    this.replaceCurrentSubtreeFromNotes(parsed);
+    const enterSourceId = this.replaceCurrentSubtreeFromNotes(parsed);
     this.notesDocumentDirty = false;
+    if (enterSourceId && this.mind.nodes[enterSourceId]) this.notesDocumentPendingEnterSourceId = enterSourceId;
+    if (autoEnter && this.enterPendingNotesChildMap()) {
+      this.afterTreeChange(true, true);
+      this.updateStatus("Notes synced; entered child node");
+      return true;
+    }
     this.refreshViewTree(this.store.focusedId);
     this.afterTreeChange(true, true);
     this.updateStatus("Notes synced to nodes");
     return true;
   };
 
+  Controller.prototype.enterPendingNotesChildMap = function () {
+    const enterSourceId = this.notesDocumentPendingEnterSourceId;
+    if (!enterSourceId || !this.mind.nodes[enterSourceId]) {
+      this.notesDocumentPendingEnterSourceId = null;
+      return false;
+    }
+    const map = this.ensureMapForNode(enterSourceId);
+    if (!map) return false;
+    this.notesDocumentPendingEnterSourceId = null;
+    this.captureActiveMap();
+    this.activeMapId = map.id;
+    this.loadMap(map);
+    return true;
+  };
+
   Controller.prototype.parseNotesDocument = function (raw) {
     const fallbackLabel = this.store.tree.label || "Chart Title";
-    const root = { label: fallbackLabel, noteLines: [], children: [] };
+    const lines = String(raw || "").replace(/\r\n?/g, "\n").split("\n");
+    const hasTopLevelHeading = lines.some((line) => /^(#)(?!#)\s+.+$/.test(line));
+    const root = { label: fallbackLabel, noteLines: [], children: [], autoEnterChild: hasTopLevelHeading };
     const stack = [root];
     let current = root;
-    String(raw || "").replace(/\r\n?/g, "\n").split("\n").forEach((line) => {
-      const heading = line.match(/^(#{2,4})(?!#)\s+(.+)$/);
+    lines.forEach((line) => {
+      const heading = line.match(/^(#{1,4})(?!#)\s+(.+)$/);
       if (heading) {
-        const depth = Math.min(heading[1].length - 1, config.limits.maxDepth);
+        const rawDepth = hasTopLevelHeading ? heading[1].length : heading[1].length - 1;
+        const depth = Math.min(Math.max(1, rawDepth), config.limits.maxDepth);
         const parentDepth = Math.max(0, depth - 1);
         const parent = stack[parentDepth] || root;
         if (parent.children.length >= config.limits.maxChildren) {
@@ -3404,6 +3459,8 @@
     };
 
     build(parsedRoot, "", rootSourceId);
+    const rootNode = this.mind.nodes[rootSourceId];
+    const enterSourceId = parsedRoot.autoEnterChild && parsedRoot.children.length === 1 && rootNode ? rootNode.children[0] : null;
     oldIds.forEach((id) => {
       if (!usedIds.has(id) && id !== rootSourceId) delete this.mind.nodes[id];
     });
@@ -3411,6 +3468,7 @@
     if (!this.maps.some((item) => item.id === this.activeMapId)) this.activeMapId = this.maps[0] ? this.maps[0].id : null;
     if (map && this.mind.nodes[rootSourceId]) map.title = this.mind.nodes[rootSourceId].label;
     this.invalidateMindIndex();
+    return enterSourceId;
   };
 
   Controller.prototype.applyLayoutPreset = function (presetName) {

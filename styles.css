@@ -3343,6 +3343,13 @@ select.native-select-hidden {
   font-weight: 700;
 }
 
+.node.view-book .markdown-code-block,
+.node.view-document .markdown-code-block {
+  fill: var(--ink);
+  font-size: 0.9em;
+  font-weight: 650;
+}
+
 .node.view-book .markdown-link {
   text-decoration: underline;
   text-decoration-thickness: 1.2px;
@@ -3353,6 +3360,24 @@ select.native-select-hidden {
 .node.view-book .markdown-highlight {
   fill: var(--node-ink);
   font-weight: 850;
+}
+
+.node.view-book .markdown-table-header,
+.node.view-document .markdown-table-header {
+  fill: var(--ink);
+  font-weight: 900;
+}
+
+.node.view-book .markdown-table-primary,
+.node.view-document .markdown-table-primary {
+  fill: var(--node-ink);
+  font-weight: 900;
+}
+
+.node.view-book .markdown-table-meta,
+.node.view-document .markdown-table-meta {
+  fill: var(--muted);
+  font-size: 0.94em;
 }
 
 .node.view-book .node-accent,

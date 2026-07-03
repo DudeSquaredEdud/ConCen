@@ -294,10 +294,17 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
             "- [x] Smoke checked item\n"
             "~~Smoke removed item~~\n"
             "==Smoke highlighted item==\n"
+            "```js\n"
+            "const total = items.length;\n"
+            "return total;\n"
+            "```\n"
             "---\n"
             "| Metric | Value |\n"
             "| --- | --- |\n"
             "| Speed | Fast |\n"
+            "| Item | Owner | Status | Due | Risk |\n"
+            "| --- | --- | --- | --- | --- |\n"
+            "| API | Ash | Active | Friday | Low |\n"
             "[Smoke link](https://example.com)\n"
             "[[Modern Smoke Root|Root Link]]\n"
             "![Smoke image](https://example.com/image.png)"
@@ -410,20 +417,33 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
                     "☑ Smoke checked item",
                     "Smoke removed item",
                     "Smoke highlighted item",
+                    "const total = items.length;",
+                    "return total;",
                     "────────────────",
                     "Metric",
                     "Value",
                     "Speed",
                     "Fast",
+                    "API",
+                    "Owner: Ash",
+                    "Status: Active",
+                    "Due: Friday",
+                    "Risk: Low",
                     "Smoke link",
                     "Root Link",
                     "▣ Smoke image",
                 ]
                 if any(text not in canvas_text for text in expected_markdown_text):
                     raise AssertionError("Book view did not render full markdown note text")
-                raw_markdown = ["# Smoke", "**Smoke note second line**", "- [x]", "~~Smoke", "==Smoke", "| --- | --- |", "—  •  —", "[Smoke link]", "[[Modern Smoke Root|Root Link]]", "![Smoke image]"]
+                raw_markdown = ["# Smoke", "**Smoke note second line**", "- [x]", "~~Smoke", "==Smoke", "```", "```js", "| --- | --- |", "—  •  —", "[Smoke link]", "[[Modern Smoke Root|Root Link]]", "![Smoke image]"]
                 if any(text in canvas_text for text in raw_markdown):
                     raise AssertionError("Book view rendered raw markdown markers")
+                if page.locator("#chartCanvas .markdown-code-block").count() < 2:
+                    raise AssertionError("Book view did not render fenced code block lines")
+                if page.locator("#chartCanvas .markdown-table-primary").count() < 2:
+                    raise AssertionError("Book view did not emphasize table primary cells")
+                if page.locator("#chartCanvas .markdown-table-meta").count() < 1:
+                    raise AssertionError("Book view did not render wide markdown table as row-card metadata")
                 if page.locator("#chartCanvas .markdown-link[role='link']").count() < 2:
                     raise AssertionError("Tree view markdown links are not interactable")
             if mode == "document":
@@ -587,6 +607,35 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
         page.wait_for_selector("#chartCanvas .node", timeout=5000)
         if "Modern Smoke Root" not in (page.locator("#chartCanvas").text_content() or ""):
             raise AssertionError("Saved node missing after reload")
+
+        page.locator("#notesViewButton").evaluate("button => button.click()")
+        page.wait_for_selector("#notesDocument:not([hidden])", timeout=3000)
+        markdown_doc = (
+            "# Imported Smoke Doc\n\n"
+            "Root note from pasted markdown.\n\n"
+            "## Section One\n\n"
+            "Section note body.\n\n"
+            "### Action Item\n\n"
+            "- Keep bullet text as note content"
+        )
+        page.locator("#notesRichEditor").evaluate(
+            """(editor, text) => {
+                editor.focus();
+                const data = new DataTransfer();
+                data.setData('text/plain', text);
+                editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+            }""",
+            markdown_doc,
+        )
+        page.locator("#radialViewButton").evaluate("button => button.click()")
+        page.wait_for_timeout(250)
+        canvas_text = page.locator("#chartCanvas").text_content() or ""
+        for expected in ["Imported Smoke Doc", "Section One", "Action Item"]:
+            if expected not in canvas_text:
+                raise AssertionError(f"Markdown Notes import missing rendered node: {expected}")
+        selected_map_label = page.locator("#mapSelect option:checked").text_content() or ""
+        if "Imported Smoke Doc" not in selected_map_label:
+            raise AssertionError(f"Markdown Notes import did not enter child map: {selected_map_label}")
 
         assert_no_browser_messages(messages)
         print(f"{browser_name}: desktop PASS")

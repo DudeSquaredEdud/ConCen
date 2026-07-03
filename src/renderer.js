@@ -490,16 +490,16 @@
   function textProfile(viewMode, depth) {
     const profiles = {
       book: {
-        0: { padX: 24, padY: 24, labelChars: 25, labelLines: 2, noteChars: 54, noteLines: Infinity, labelLineHeight: 29, noteLineHeight: 16, noteGap: 14 },
-        1: { padX: 19, padY: 17, labelChars: 25, labelLines: 2, noteChars: 44, noteLines: Infinity, labelLineHeight: 22, noteLineHeight: 15, noteGap: 11 },
-        2: { padX: 17, padY: 16, labelChars: 30, labelLines: 2, noteChars: 48, noteLines: Infinity, labelLineHeight: 20, noteLineHeight: 14, noteGap: 10 },
-        3: { padX: 15, padY: 14, labelChars: 26, labelLines: 2, noteChars: 40, noteLines: Infinity, labelLineHeight: 18, noteLineHeight: 13, noteGap: 8 }
+        0: { padX: 24, padY: 24, labelChars: 25, labelLines: 2, noteChars: 54, noteLines: Infinity, labelLineHeight: 31, noteLineHeight: 21, noteGap: 16 },
+        1: { padX: 19, padY: 17, labelChars: 25, labelLines: 2, noteChars: 44, noteLines: Infinity, labelLineHeight: 24, noteLineHeight: 19, noteGap: 13 },
+        2: { padX: 17, padY: 16, labelChars: 30, labelLines: 2, noteChars: 48, noteLines: Infinity, labelLineHeight: 22, noteLineHeight: 18, noteGap: 12 },
+        3: { padX: 15, padY: 14, labelChars: 26, labelLines: 2, noteChars: 40, noteLines: Infinity, labelLineHeight: 20, noteLineHeight: 17, noteGap: 10 }
       },
       document: {
-        0: { padX: 32, padY: 28, labelChars: 40, labelLines: 2, noteChars: 86, noteLines: Infinity, labelLineHeight: 34, noteLineHeight: 17, noteGap: 16 },
-        1: { padX: 26, padY: 18, labelChars: 52, labelLines: 2, noteChars: 84, noteLines: Infinity, labelLineHeight: 25, noteLineHeight: 16, noteGap: 12 },
-        2: { padX: 24, padY: 15, labelChars: 56, labelLines: 2, noteChars: 80, noteLines: Infinity, labelLineHeight: 21, noteLineHeight: 15, noteGap: 10 },
-        3: { padX: 22, padY: 13, labelChars: 58, labelLines: 2, noteChars: 76, noteLines: Infinity, labelLineHeight: 18, noteLineHeight: 14, noteGap: 8 }
+        0: { padX: 32, padY: 28, labelChars: 40, labelLines: 2, noteChars: 86, noteLines: Infinity, labelLineHeight: 36, noteLineHeight: 22, noteGap: 18 },
+        1: { padX: 26, padY: 18, labelChars: 52, labelLines: 2, noteChars: 84, noteLines: Infinity, labelLineHeight: 27, noteLineHeight: 20, noteGap: 14 },
+        2: { padX: 24, padY: 15, labelChars: 56, labelLines: 2, noteChars: 80, noteLines: Infinity, labelLineHeight: 23, noteLineHeight: 19, noteGap: 12 },
+        3: { padX: 22, padY: 13, labelChars: 58, labelLines: 2, noteChars: 76, noteLines: Infinity, labelLineHeight: 20, noteLineHeight: 18, noteGap: 10 }
       }
     };
     return profiles[viewMode] && profiles[viewMode][depth];
@@ -514,13 +514,20 @@
           dy: lineIndex === 0 && first ? 0 : first ? lineHeight : 0
         };
         if (first) attrs.x = x;
-        if (segment.bold || line.variant === "heading" || line.variant === "table-heading") attrs["font-weight"] = "900";
+        if (segment.bold || segment.tableHeader || segment.tablePrimary || line.variant === "heading" || line.variant === "table-heading") attrs["font-weight"] = "900";
         if (segment.italic || line.variant === "quote") attrs["font-style"] = "italic";
         if (segment.strike) attrs["text-decoration"] = "line-through";
         if (segment.code) attrs.class = "markdown-code";
+        if (segment.codeBlock) {
+          attrs.class = attrs.class ? attrs.class + " markdown-code-block" : "markdown-code-block";
+          attrs["xml:space"] = "preserve";
+        }
         if (segment.link) attrs.class = attrs.class ? attrs.class + " markdown-link" : "markdown-link";
         if (segment.highlight) attrs.class = attrs.class ? attrs.class + " markdown-highlight" : "markdown-highlight";
         if (segment.tableCell) attrs.class = attrs.class ? attrs.class + " markdown-table-cell" : "markdown-table-cell";
+        if (segment.tableHeader) attrs.class = attrs.class ? attrs.class + " markdown-table-header" : "markdown-table-header";
+        if (segment.tablePrimary) attrs.class = attrs.class ? attrs.class + " markdown-table-primary" : "markdown-table-primary";
+        if (line.variant === "table-card-meta") attrs.class = attrs.class ? attrs.class + " markdown-table-meta" : "markdown-table-meta";
         if (segment.cellX !== null && segment.cellX !== undefined) attrs.x = x + segment.cellX;
         const tspan = utils.svgEl("tspan", attrs);
         tspan.textContent = segment.text;
@@ -553,9 +560,16 @@
     if (!clean) return [];
     const limit = Number.isFinite(maxLines) ? maxLines : Infinity;
     const result = [];
-    const rawLines = clean.split(/\n+/);
+    const rawLines = clean.split("\n");
     for (let lineIndex = 0; lineIndex < rawLines.length; lineIndex += 1) {
       const rawLine = rawLines[lineIndex];
+      const code = markdownCodeBlockLines(rawLines, lineIndex, charsPerLine);
+      if (code) {
+        code.lines.forEach((line) => result.push(line));
+        lineIndex += code.consumed - 1;
+        continue;
+      }
+      if (!rawLine.trim()) continue;
       const table = markdownTableLines(rawLines, lineIndex, charsPerLine);
       if (table) {
         table.lines.forEach((line) => result.push(line));
@@ -574,6 +588,42 @@
     return result.slice(0, limit);
   }
 
+  function markdownCodeBlockLines(rawLines, startIndex, charsPerLine) {
+    const first = String(rawLines[startIndex] || "").trim();
+    if (!/^```/.test(first)) return null;
+    const body = [];
+    let cursor = startIndex + 1;
+    while (cursor < rawLines.length) {
+      const line = String(rawLines[cursor] || "");
+      if (/^```/.test(line.trim())) break;
+      body.push(line.replace(/\t/g, "  "));
+      cursor += 1;
+    }
+    const consumed = cursor < rawLines.length ? cursor - startIndex + 1 : cursor - startIndex;
+    const width = Math.max(8, charsPerLine - 2);
+    const lines = [];
+    const source = body.length ? body : [""];
+    source.forEach((line) => {
+      fixedWidthChunks(line, width).forEach((chunk) => {
+        lines.push({
+          segments: [markdownSegment("  " + (chunk || " "), { code: true, codeBlock: true })],
+          variant: "code-block"
+        });
+      });
+    });
+    return { lines, consumed: Math.max(1, consumed) };
+  }
+
+  function fixedWidthChunks(value, width) {
+    const text = String(value || "");
+    if (!text) return [""];
+    const chunks = [];
+    for (let index = 0; index < text.length; index += width) {
+      chunks.push(text.slice(index, index + width));
+    }
+    return chunks;
+  }
+
   function markdownTableLines(rawLines, startIndex, charsPerLine) {
     const header = parseTableRow(rawLines[startIndex]);
     const separator = parseTableRow(rawLines[startIndex + 1]);
@@ -582,6 +632,8 @@
     const rows = [header.cells];
     let cursor = startIndex + 2;
     while (cursor < rawLines.length) {
+      const nextSeparator = parseTableRow(rawLines[cursor + 1]);
+      if (cursor > startIndex + 2 && nextSeparator && isTableSeparator(nextSeparator.cells)) break;
       const row = parseTableRow(rawLines[cursor]);
       if (!row) break;
       rows.push(row.cells);
@@ -589,24 +641,9 @@
     }
 
     const colCount = Math.max(1, ...rows.map((row) => row.length));
-    const gapChars = 3;
-    const cellChars = Math.max(4, Math.floor((charsPerLine - (colCount - 1) * gapChars) / colCount));
-    const cellStep = Math.max(44, (cellChars + gapChars) * 7);
-    const lines = [];
-
-    rows.forEach((cells, rowIndex) => {
-      lines.push({
-        segments: tableSegments(cells, colCount, cellChars, cellStep),
-        variant: rowIndex === 0 ? "table-heading" : "table"
-      });
-      if (rowIndex === 0) {
-        lines.push({
-          segments: [markdownSegment("─".repeat(Math.max(18, Math.min(charsPerLine, colCount * cellChars + (colCount - 1) * gapChars))))],
-          variant: "table-rule"
-        });
-      }
-    });
-
+    const lines = colCount > 4
+      ? wideTableCardLines(rows, charsPerLine)
+      : compactTableLines(rows, colCount, charsPerLine);
     return { lines, consumed: Math.max(2, cursor - startIndex) };
   }
 
@@ -623,25 +660,98 @@
     return cells.length > 1 && cells.every((cell) => /^:?-{3,}:?$/.test(cell.trim()));
   }
 
-  function tableSegments(cells, colCount, cellChars, cellStep) {
+  function compactTableLines(rows, colCount, charsPerLine) {
+    const gapChars = 3;
+    const cellChars = Math.max(5, Math.floor((charsPerLine - (colCount - 1) * gapChars) / colCount));
+    const cellStep = Math.max(52, (cellChars + gapChars) * 7);
+    const lines = [];
+
+    rows.forEach((cells, rowIndex) => {
+      const wrappedCells = [];
+      for (let index = 0; index < colCount; index += 1) {
+        wrappedCells.push(wrapTableCell(cells[index] || "", cellChars));
+      }
+      const rowHeight = Math.max(1, ...wrappedCells.map((cell) => cell.length));
+      for (let lineIndex = 0; lineIndex < rowHeight; lineIndex += 1) {
+        lines.push({
+          segments: tableSegments(wrappedCells.map((cell) => cell[lineIndex] || ""), colCount, cellStep, rowIndex === 0),
+          variant: rowIndex === 0 ? "table-heading" : "table"
+        });
+      }
+      if (rowIndex === 0 || rowIndex < rows.length - 1) {
+        lines.push({
+          segments: [markdownSegment("─".repeat(Math.max(18, Math.min(charsPerLine, colCount * cellChars + (colCount - 1) * gapChars))))],
+          variant: rowIndex === 0 ? "table-rule" : "table-row-rule"
+        });
+      }
+    });
+    return lines;
+  }
+
+  function wideTableCardLines(rows, charsPerLine) {
+    const headers = rows[0].map((cell) => cleanMarkdownCell(cell));
+    const lines = [];
+    rows.slice(1).forEach((cells, rowIndex) => {
+      const title = cleanMarkdownCell(cells[0] || "Row " + (rowIndex + 1));
+      wrapSegments(parseInlineMarkdown(title), charsPerLine).forEach((segments) => {
+        lines.push({ segments: segments.map((segment) => Object.assign({}, segment, { tablePrimary: true })), variant: "table-card-title" });
+      });
+      const details = cells.slice(1)
+        .map((cell, index) => {
+          const header = headers[index + 1] || "Field " + (index + 2);
+          const value = cleanMarkdownCell(cell);
+          return value ? header + ": " + value : "";
+        })
+        .filter(Boolean)
+        .join(" · ");
+      if (details) {
+        wrapSegments(parseInlineMarkdown(details), Math.max(12, charsPerLine - 2)).forEach((segments) => {
+          lines.push({ segments, variant: "table-card-meta" });
+        });
+      }
+      if (rowIndex < rows.length - 2) {
+        lines.push({ segments: [markdownSegment("─".repeat(Math.max(18, Math.min(charsPerLine, 42))))], variant: "table-row-rule" });
+      }
+    });
+    return lines;
+  }
+
+  function wrapTableCell(value, maxChars) {
+    const text = cleanMarkdownCell(value);
+    if (!text) return [""];
+    const lines = [];
+    let line = "";
+    text.split(/\s+/).filter(Boolean).forEach((word) => {
+      const next = line ? line + " " + word : word;
+      if (next.length <= maxChars) {
+        line = next;
+        return;
+      }
+      if (line) lines.push(line);
+      line = word.length > maxChars ? word.slice(0, maxChars) : word;
+    });
+    if (line) lines.push(line);
+    return lines.length ? lines : [""];
+  }
+
+  function cleanMarkdownCell(value) {
+    return String(value || "").trim();
+  }
+
+  function tableSegments(cells, colCount, cellStep, isHeader) {
     const segments = [];
     for (let index = 0; index < colCount; index += 1) {
-      const cell = ellipsize(cells[index] || "", cellChars);
-      const parsed = parseInlineMarkdown(cell);
+      const parsed = parseInlineMarkdown(cells[index] || "");
       parsed.forEach((segment, segmentIndex) => {
         segments.push(Object.assign({}, segment, {
+          tableHeader: isHeader,
           tableCell: true,
+          tablePrimary: index === 0,
           cellX: segmentIndex === 0 ? index * cellStep : null
         }));
       });
     }
     return segments.length ? segments : [markdownSegment("")];
-  }
-
-  function ellipsize(value, maxChars) {
-    const text = String(value || "").trim();
-    if (text.length <= maxChars) return text;
-    return text.slice(0, Math.max(1, maxChars - 1)).trimEnd() + "…";
   }
 
   function blockMarkdown(rawLine, purpose) {
@@ -741,7 +851,7 @@
   }
 
   function markdownSegment(text, attrs) {
-    return Object.assign({ text, bold: false, italic: false, code: false, strike: false, highlight: false, link: false, action: null }, attrs || {});
+    return Object.assign({ text, bold: false, italic: false, code: false, codeBlock: false, strike: false, highlight: false, link: false, action: null }, attrs || {});
   }
 
   function isHttpUrl(value) {
