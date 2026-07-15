@@ -42,6 +42,7 @@
     githubDisconnectButton: document.getElementById("githubDisconnectButton"),
     clearRecentMindsButton: document.getElementById("clearRecentMindsButton"),
     mindMenu: document.querySelector(".mind-menu"),
+    mapMenu: document.querySelector(".map-menu"),
     titleInput: document.getElementById("titleInput"),
     settingsMenu: document.querySelector(".settings-menu"),
     saveState: document.getElementById("saveState"),

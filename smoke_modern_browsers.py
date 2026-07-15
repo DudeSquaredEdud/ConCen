@@ -282,6 +282,8 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
         if initial_nodes != 1:
             raise AssertionError(f"Expected one initial node, got {initial_nodes}")
 
+        page.locator(".map-menu > summary").click()
+        page.wait_for_selector(".map-menu[open] .map-panel", timeout=3000)
         page.locator("#titleInput").fill("Modern Smoke Root")
         page.wait_for_timeout(150)
         if "Modern Smoke Root" not in (page.locator("#chartCanvas").text_content() or ""):
@@ -364,8 +366,8 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
             Path(settings_path).unlink(missing_ok=True)
         page.locator(".mind-menu > summary").click()
 
-        page.locator(".settings-menu > summary").click()
-        page.wait_for_selector(".settings-menu[open] .settings-panel", timeout=3000)
+        page.locator(".map-menu > summary").click()
+        page.wait_for_selector(".map-menu[open] .map-panel", timeout=3000)
         page.locator("#treeViewButton").click()
         if page.locator("#treeViewButton").get_attribute("aria-pressed") != "true":
             raise AssertionError("Flat view button did not activate")
@@ -472,7 +474,7 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
         page.locator("#treeViewButton").click()
         if page.locator("#treeViewButton").get_attribute("aria-pressed") != "true":
             raise AssertionError("Flat view button did not reactivate after radial")
-        page.locator(".settings-menu > summary").click()
+        page.locator(".map-menu > summary").click()
 
         page.locator("#zoomInButton").click()
         page.locator("#zoomOutButton").click()
@@ -515,6 +517,12 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
         menu_style = page.locator(".settings-panel").evaluate("el => ({ maxHeight: getComputedStyle(el).maxHeight, overflowY: getComputedStyle(el).overflowY })")
         if menu_style["overflowY"] != "auto" or menu_style["maxHeight"] == "none":
             raise AssertionError(f"Settings panel did not have bounded scrolling: {menu_style}")
+        page.locator(".settings-menu > summary").click()
+        page.locator(".map-menu > summary").click()
+        page.wait_for_selector(".map-menu[open] .map-panel", timeout=3000)
+        map_menu_style = page.locator(".map-panel").evaluate("el => ({ maxHeight: getComputedStyle(el).maxHeight, overflowY: getComputedStyle(el).overflowY })")
+        if map_menu_style["overflowY"] != "auto" or map_menu_style["maxHeight"] == "none":
+            raise AssertionError(f"Map panel did not have bounded scrolling: {map_menu_style}")
         page.locator("#radialViewButton").click()
         page.locator("[data-layout-preset='wide']").click()
         page.wait_for_timeout(150)
@@ -529,7 +537,7 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
         if page.locator("#ringNodeGapInput").input_value() != "40":
             raise AssertionError("Range control did not sync number input")
         page.keyboard.press("Escape")
-        page.locator(".settings-menu > summary").click()
+        page.locator(".map-menu > summary").click()
         page.locator(".mind-menu > summary").click()
         page.locator(".trust-data > summary").click()
         page.locator("#authorDisplayNameInput").fill("Smoke Tester")
@@ -566,6 +574,8 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
         if page.locator("#recoveryList .recovery-item").count() < 1:
             raise AssertionError("Recovery point did not render")
         page.locator("#recoveryCloseButton").click()
+        page.locator(".map-menu > summary").click()
+        page.wait_for_selector(".map-menu[open] .map-panel", timeout=3000)
         page.locator("#titleInput").fill("Broken Smoke Root")
         page.wait_for_timeout(150)
         if "Broken Smoke Root" not in (page.locator("#chartCanvas").text_content() or ""):
@@ -582,6 +592,8 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
         if "Modern Smoke Root" not in (page.locator("#chartCanvas").text_content() or ""):
             raise AssertionError("Recovery restore did not restore original title")
 
+        page.locator(".map-menu > summary").click()
+        page.wait_for_selector(".map-menu[open] .map-panel", timeout=3000)
         before_maps = page.locator("#mapSelect option").count()
         page.locator("#newMapButton").click()
         page.wait_for_timeout(250)
@@ -594,7 +606,6 @@ def smoke_desktop(browser_type, browser_name: str, url: str) -> None:
             raise AssertionError("Custom map dropdown option count mismatch")
         page.keyboard.press("Escape")
 
-        page.locator(".mind-menu > summary").click()
         page.locator("#deleteMapButton").click()
         page.wait_for_selector("#appDialog:not([hidden])", timeout=3000)
         page.locator("#appDialogActions button", has_text="Delete").click()
@@ -669,6 +680,12 @@ def smoke_mobile(browser_type, browser_name: str, url: str) -> None:
         if settings_height < 240:
             raise AssertionError(f"Mobile settings panel collapsed: {settings_height}")
         page.locator(".settings-menu > summary").click()
+        page.locator(".map-menu > summary").click()
+        page.wait_for_selector(".map-menu[open] .map-panel", timeout=3000)
+        map_panel_width = page.locator(".map-panel").evaluate("el => el.getBoundingClientRect().width")
+        if map_panel_width > 390:
+            raise AssertionError(f"Mobile map panel too wide: {map_panel_width}px")
+        page.locator(".map-menu > summary").click()
         exercise_appearance_presets(page, check_overflow=True)
         page.set_viewport_size({"width": 320, "height": 700})
         page.wait_for_timeout(150)

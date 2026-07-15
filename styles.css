@@ -739,8 +739,8 @@ summary:focus-visible,
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.32) inset;
 }
 
-.title-controls {
-  flex: 1 1 260px;
+.map-controls {
+  flex: 1 1 360px;
 }
 
 .utility-controls {
@@ -871,7 +871,8 @@ button,
 .import-mind,
 .import-theme,
 .settings-menu summary,
-.command-menu > summary {
+.command-menu > summary,
+.map-menu > summary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -984,13 +985,15 @@ button:hover,
 .github-import-settings:hover,
 .import-theme:hover,
 .settings-menu summary:hover,
-.command-menu > summary:hover {
+.command-menu > summary:hover,
+.map-menu > summary:hover {
   background: var(--control-hover);
 }
 
 button:active,
 .settings-menu summary:active,
-.command-menu > summary:active {
+.command-menu > summary:active,
+.map-menu > summary:active {
   background: var(--control-pressed);
   transform: translateY(1px);
 }
@@ -1039,24 +1042,28 @@ button:disabled:hover {
 }
 
 .settings-menu,
-.command-menu {
+.command-menu,
+.map-menu {
   position: relative;
 }
 
 .settings-menu summary,
-.command-menu summary {
+.command-menu summary,
+.map-menu summary {
   display: inline-flex;
   align-items: center;
   list-style: none;
 }
 
 .settings-menu summary::-webkit-details-marker,
-.command-menu summary::-webkit-details-marker {
+.command-menu summary::-webkit-details-marker,
+.map-menu summary::-webkit-details-marker {
   display: none;
 }
 
 .settings-panel,
-.command-panel {
+.command-panel,
+.map-panel {
   position: absolute;
   top: calc(100% + 10px);
   right: 0;
@@ -1083,8 +1090,45 @@ button:disabled:hover {
   gap: 6px;
 }
 
+.map-panel {
+  left: 0;
+  right: auto;
+  min-width: min(390px, calc(100vw - 24px));
+}
+
+.map-panel .title-field {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.map-navigation-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.map-panel > button,
+.map-navigation-actions button {
+  width: 100%;
+  min-height: 34px;
+}
+
+.map-panel > button::before,
+.map-navigation-actions button::before {
+  content: attr(data-icon);
+  display: grid;
+  place-items: center;
+  width: 18px;
+  margin-right: 8px;
+  color: var(--muted);
+  font-weight: 760;
+}
+
 .settings-panel,
-.command-panel {
+.command-panel,
+.map-panel {
   scrollbar-gutter: stable;
 }
 
@@ -3670,7 +3714,8 @@ select.native-select-hidden {
   .theme-actions button,
   .import-mind,
   .import-theme,
-  .settings-menu summary {
+  .settings-menu summary,
+  .map-menu > summary {
     width: 100%;
     min-height: 36px;
     justify-content: center;
@@ -3733,7 +3778,8 @@ select.native-select-hidden {
   }
 
   .settings-panel,
-  .command-panel {
+  .command-panel,
+  .map-panel {
     position: static;
     min-width: 0;
     margin-top: 8px;
@@ -3750,6 +3796,26 @@ select.native-select-hidden {
     z-index: 30;
     max-height: min(70vh, 560px);
     overflow: auto;
+  }
+
+  .map-menu {
+    width: 100%;
+  }
+
+  .map-menu[open] .map-panel {
+    position: fixed;
+    top: auto;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    z-index: 30;
+    max-height: min(78vh, 640px);
+    overflow: auto;
+  }
+
+  .map-menu[open] > summary {
+    position: relative;
+    z-index: 31;
   }
 
   .settings-menu[open] > summary {

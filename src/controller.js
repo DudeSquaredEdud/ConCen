@@ -287,14 +287,15 @@
     if (this.el.trustPullButton) this.el.trustPullButton.addEventListener("click", () => this.pullMindFromGithub());
     if (this.el.trustDisconnectButton) this.el.trustDisconnectButton.addEventListener("click", () => this.disconnectGithubSync());
     if (this.el.clearRecentMindsButton) this.el.clearRecentMindsButton.addEventListener("click", () => this.clearRecentMinds("recent"));
-    [this.el.mindMenu, this.el.settingsMenu].forEach((menu) => {
+    const toolbarMenus = [this.el.mapMenu, this.el.mindMenu, this.el.settingsMenu];
+    toolbarMenus.forEach((menu) => {
       if (!menu) return;
       menu.addEventListener("toggle", () => {
         if (!menu.open) {
-          if (![this.el.mindMenu, this.el.settingsMenu].some((other) => other && other.open)) this.reclaimCanvasFocus();
+          if (!toolbarMenus.some((other) => other && other.open)) this.reclaimCanvasFocus();
           return;
         }
-        [this.el.mindMenu, this.el.settingsMenu].forEach((other) => {
+        toolbarMenus.forEach((other) => {
           if (other && other !== menu) other.open = false;
         });
       });
@@ -573,6 +574,7 @@
       return;
     }
     if (this.el.mindMenu) this.el.mindMenu.open = false;
+    if (this.el.mapMenu) this.el.mapMenu.open = false;
     if (this.el.settingsMenu) this.el.settingsMenu.open = false;
     if (this.layoutSettingsOpen) this.closeLayoutSettings();
     this.enterScreensaver();

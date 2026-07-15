@@ -35,22 +35,79 @@
             <select id="mapSelect"></select>
             <div id="mapSelectDropdown" class="custom-select map-select-dropdown" data-for="mapSelect"></div>
           </label>
-          <button id="parentMapButton" class="icon-button" data-icon="‹" type="button" title="Go to parent map (Ctrl+Left)" aria-label="Go to parent map">
-            <span class="visually-hidden">Parent Map</span>
-          </button>
-          <button id="childMapButton" class="icon-button" data-icon="›" type="button" title="Return to recent child map (Ctrl+Right)" aria-label="Return to recent child map">
-            <span class="visually-hidden">Child Map</span>
-          </button>
-          <button id="newMapButton" class="icon-button" data-icon="+" type="button" title="New map" aria-label="New map">
-            <span class="visually-hidden">New Map</span>
-          </button>
-        </div>
+          <details class="map-menu">
+            <summary class="icon-button" data-icon="⋯" data-icon-name="map" title="Map controls" aria-label="Map controls">
+              <span class="visually-hidden">Map Controls</span>
+            </summary>
+            <div class="map-panel">
+              <span class="settings-section-title">Current Map</span>
+              <label class="title-field">
+                <span>Title</span>
+                <input id="titleInput" type="text" value="Chart Title" autocomplete="off">
+              </label>
+              <div class="map-navigation-actions" role="group" aria-label="Map navigation">
+                <button id="parentMapButton" data-icon="‹" type="button" title="Go to parent map (Ctrl+Left)">Parent</button>
+                <button id="childMapButton" data-icon="›" type="button" title="Return to recent child map (Ctrl+Right)">Recent Child</button>
+              </div>
+              <button id="newMapButton" data-icon="+" type="button">New Map</button>
 
-        <div class="toolbar-group title-controls" aria-label="Title controls">
-          <label class="title-field">
-            <span>Title</span>
-            <input id="titleInput" type="text" value="Chart Title" autocomplete="off">
-          </label>
+              <input id="viewModeInput" class="legacy-view-mode" type="checkbox" checked hidden>
+              <div class="spacing-controls" aria-label="Current map layout controls">
+                <div class="spacing-header">
+                  <span class="settings-section-title">Layout</span>
+                  <div class="segmented-control view-mode-control" role="group" aria-label="View mode">
+                    <button id="treeViewButton" type="button" aria-pressed="false">Flat</button>
+                    <button id="radialViewButton" type="button" aria-pressed="false">Radial</button>
+                    <button id="bookViewButton" type="button" aria-pressed="false">Tree</button>
+                    <button id="documentViewButton" type="button" aria-pressed="false">Book</button>
+                    <button id="notesViewButton" type="button" aria-pressed="false">Notes</button>
+                  </div>
+                  <div class="layout-preset-row" role="group" aria-label="Layout presets">
+                    <button type="button" data-layout-preset="compact">Compact</button>
+                    <button type="button" data-layout-preset="balanced">Balanced</button>
+                    <button type="button" data-layout-preset="wide">Wide</button>
+                  </div>
+                </div>
+                <div id="layoutSettingsDropdown" class="layout-settings-dropdown">
+                  <button id="layoutSettingsButton" class="custom-select-button" type="button" aria-expanded="false" aria-controls="layoutSettingsPanel">Tune layout</button>
+                  <div id="layoutSettingsPanel" class="layout-settings-panel" hidden>
+                    <div id="layoutSettingsSummary" class="layout-settings-summary">Flat settings</div>
+                    <div class="range-field" data-spacing-key="treeLevelGap" role="group" aria-labelledby="treeLevelGapLabel">
+                      <span id="treeLevelGapLabel">Layer spacing</span>
+                      <input id="treeLevelGapRange" type="range" min="40" max="260" step="4" value="72" aria-labelledby="treeLevelGapLabel">
+                      <input id="treeLevelGapInput" type="number" min="40" max="260" step="4" value="72" aria-label="Layer spacing value">
+                    </div>
+                    <div class="range-field" data-spacing-key="treeLeafGap" role="group" aria-labelledby="treeLeafGapLabel">
+                      <span id="treeLeafGapLabel">Column spacing</span>
+                      <input id="treeLeafGapRange" type="range" min="32" max="360" step="4" value="92" aria-labelledby="treeLeafGapLabel">
+                      <input id="treeLeafGapInput" type="number" min="32" max="360" step="4" value="92" aria-label="Column spacing value">
+                    </div>
+                    <div class="range-field" data-spacing-key="ringBaseRadius" role="group" aria-labelledby="ringBaseRadiusLabel">
+                      <span id="ringBaseRadiusLabel">Center radius</span>
+                      <input id="ringBaseRadiusRange" type="range" min="40" max="500" step="5" value="102" aria-labelledby="ringBaseRadiusLabel">
+                      <input id="ringBaseRadiusInput" type="number" min="40" max="500" step="5" value="102" aria-label="Center radius value">
+                    </div>
+                    <div class="range-field" data-spacing-key="ringDepthGap" role="group" aria-labelledby="ringDepthGapLabel">
+                      <span id="ringDepthGapLabel">Ring spacing</span>
+                      <input id="ringDepthGapRange" type="range" min="40" max="500" step="5" value="90" aria-labelledby="ringDepthGapLabel">
+                      <input id="ringDepthGapInput" type="number" min="40" max="500" step="5" value="90" aria-label="Ring spacing value">
+                    </div>
+                    <div class="range-field" data-spacing-key="ringNodeGap" role="group" aria-labelledby="ringNodeGapLabel">
+                      <span id="ringNodeGapLabel">Node spacing</span>
+                      <input id="ringNodeGapRange" type="range" min="0" max="200" step="4" value="20" aria-labelledby="ringNodeGapLabel">
+                      <input id="ringNodeGapInput" type="number" min="0" max="200" step="4" value="20" aria-label="Node spacing value">
+                    </div>
+                    <div class="range-field common-range-field" role="group" aria-labelledby="nodeFontSizeLabel">
+                      <span id="nodeFontSizeLabel">Font size</span>
+                      <input id="nodeFontSizeRange" type="range" min="9" max="22" step="0.5" value="13" aria-labelledby="nodeFontSizeLabel">
+                      <input id="nodeFontSizeInput" type="number" min="9" max="22" step="0.5" value="13" aria-label="Font size value">
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <button id="deleteMapButton" type="button" class="quiet-danger" data-icon="−">Delete Map</button>
+            </div>
+          </details>
         </div>
 
         <div class="toolbar-group utility-controls" aria-label="View controls">
@@ -141,7 +198,6 @@
                 </div>
               </details>
               <button id="clearRecentMindsButton" type="button" data-icon="⌫">Clear Recents</button>
-              <button id="deleteMapButton" type="button" class="quiet-danger" data-icon="−">Delete Map</button>
               <button id="resetButton" type="button" class="quiet-danger" data-icon="×">Reset Mind</button>
             </div>
           </details>
@@ -150,7 +206,6 @@
               <span class="visually-hidden">Settings</span>
             </summary>
             <div class="settings-panel">
-              <input id="viewModeInput" class="legacy-view-mode" type="checkbox" checked hidden>
               <div class="theme-controls" aria-label="Theme controls">
                 <span class="settings-section-title">Appearance</span>
                 <label class="theme-field">
@@ -196,59 +251,6 @@
                   <input id="screensaverEnabledInput" type="checkbox">
                 </label>
                 <button id="startScreensaverButton" class="screensaver-start-button" type="button" data-icon="◎">Start Screensaver</button>
-              </div>
-              <div class="spacing-controls" aria-label="Spacing controls">
-                <div class="spacing-header">
-                  <span class="settings-section-title">Layout</span>
-                  <div class="segmented-control view-mode-control" role="group" aria-label="View mode">
-                    <button id="treeViewButton" type="button" aria-pressed="false">Flat</button>
-                    <button id="radialViewButton" type="button" aria-pressed="false">Radial</button>
-                    <button id="bookViewButton" type="button" aria-pressed="false">Tree</button>
-                    <button id="documentViewButton" type="button" aria-pressed="false">Book</button>
-                    <button id="notesViewButton" type="button" aria-pressed="false">Notes</button>
-                  </div>
-                  <div class="layout-preset-row" role="group" aria-label="Layout presets">
-                    <button type="button" data-layout-preset="compact">Compact</button>
-                    <button type="button" data-layout-preset="balanced">Balanced</button>
-                    <button type="button" data-layout-preset="wide">Wide</button>
-                  </div>
-                </div>
-                <div id="layoutSettingsDropdown" class="layout-settings-dropdown">
-                  <button id="layoutSettingsButton" class="custom-select-button" type="button" aria-expanded="false" aria-controls="layoutSettingsPanel">Tune layout</button>
-                  <div id="layoutSettingsPanel" class="layout-settings-panel" hidden>
-                    <div id="layoutSettingsSummary" class="layout-settings-summary">Flat settings</div>
-                    <div class="range-field" data-spacing-key="treeLevelGap" role="group" aria-labelledby="treeLevelGapLabel">
-                      <span id="treeLevelGapLabel">Layer spacing</span>
-                      <input id="treeLevelGapRange" type="range" min="40" max="260" step="4" value="72" aria-labelledby="treeLevelGapLabel">
-                      <input id="treeLevelGapInput" type="number" min="40" max="260" step="4" value="72" aria-label="Layer spacing value">
-                    </div>
-                    <div class="range-field" data-spacing-key="treeLeafGap" role="group" aria-labelledby="treeLeafGapLabel">
-                      <span id="treeLeafGapLabel">Column spacing</span>
-                      <input id="treeLeafGapRange" type="range" min="32" max="360" step="4" value="92" aria-labelledby="treeLeafGapLabel">
-                      <input id="treeLeafGapInput" type="number" min="32" max="360" step="4" value="92" aria-label="Column spacing value">
-                    </div>
-                    <div class="range-field" data-spacing-key="ringBaseRadius" role="group" aria-labelledby="ringBaseRadiusLabel">
-                      <span id="ringBaseRadiusLabel">Center radius</span>
-                      <input id="ringBaseRadiusRange" type="range" min="40" max="500" step="5" value="102" aria-labelledby="ringBaseRadiusLabel">
-                      <input id="ringBaseRadiusInput" type="number" min="40" max="500" step="5" value="102" aria-label="Center radius value">
-                    </div>
-                    <div class="range-field" data-spacing-key="ringDepthGap" role="group" aria-labelledby="ringDepthGapLabel">
-                      <span id="ringDepthGapLabel">Ring spacing</span>
-                      <input id="ringDepthGapRange" type="range" min="40" max="500" step="5" value="90" aria-labelledby="ringDepthGapLabel">
-                      <input id="ringDepthGapInput" type="number" min="40" max="500" step="5" value="90" aria-label="Ring spacing value">
-                    </div>
-                    <div class="range-field" data-spacing-key="ringNodeGap" role="group" aria-labelledby="ringNodeGapLabel">
-                      <span id="ringNodeGapLabel">Node spacing</span>
-                      <input id="ringNodeGapRange" type="range" min="0" max="200" step="4" value="20" aria-labelledby="ringNodeGapLabel">
-                      <input id="ringNodeGapInput" type="number" min="0" max="200" step="4" value="20" aria-label="Node spacing value">
-                    </div>
-                    <div class="range-field common-range-field" role="group" aria-labelledby="nodeFontSizeLabel">
-                      <span id="nodeFontSizeLabel">Font size</span>
-                      <input id="nodeFontSizeRange" type="range" min="9" max="22" step="0.5" value="13" aria-labelledby="nodeFontSizeLabel">
-                      <input id="nodeFontSizeInput" type="number" min="9" max="22" step="0.5" value="13" aria-label="Font size value">
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </details>
